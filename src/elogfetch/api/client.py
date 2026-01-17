@@ -99,10 +99,17 @@ class ElogClient:
         try:
             response = self._session.get(url, headers=headers, params=params)
 
-            if response.status_code == 401:
-                raise AuthenticationError(
-                    "Authentication failed. Please run 'kinit' to refresh your ticket."
-                )
+            # On 401, try refreshing the Kerberos ticket once
+            if response.status_code == 401 and require_auth:
+                logger.debug(f"Got 401 for {endpoint}, refreshing auth headers")
+                self._auth_headers = None  # Clear cached headers
+                headers = self._get_auth_headers()  # Get fresh headers
+                response = self._session.get(url, headers=headers, params=params)
+
+                if response.status_code == 401:
+                    raise AuthenticationError(
+                        f"Access denied for {endpoint}. Check if you have permission."
+                    )
 
             if response.status_code == 403:
                 raise AuthenticationError(
