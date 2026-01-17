@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
+import queue
 import shutil
 import sys
 from pathlib import Path
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Thread, Event, Lock
 
 import click
 
@@ -61,8 +63,10 @@ def cli(ctx, config, verbose, quiet):
 @click.option("--parallel", "-p", type=int, help="Number of parallel jobs")
 @click.option("--incremental", "-i", is_flag=True,
               help="Update existing database incrementally (default: create fresh)")
+@click.option("--queue-size", "-q", type=int, help="Queue size for streaming (default: 100)")
+@click.option("--batch-size", "-b", type=int, help="Experiments per commit batch (default: 50)")
 @click.pass_context
-def update(ctx, hours, exclude, output_dir, dry_run, parallel, incremental):
+def update(ctx, hours, exclude, output_dir, dry_run, parallel, incremental, queue_size, batch_size):
     """Update the local database with recent experiments."""
     logger = ctx.obj["logger"]
     config = ctx.obj["config"]
@@ -77,6 +81,10 @@ def update(ctx, hours, exclude, output_dir, dry_run, parallel, incremental):
         cli_args["parallel_jobs"] = parallel
     if output_dir:
         cli_args["database_dir"] = output_dir
+    if queue_size is not None:
+        cli_args["queue_size"] = queue_size
+    if batch_size is not None:
+        cli_args["batch_commit_size"] = batch_size
 
     config = Config.load(cli_args=cli_args)
 
@@ -133,7 +141,12 @@ def update(ctx, hours, exclude, output_dir, dry_run, parallel, incremental):
 
 
 def _do_update(client, experiments, db_dir, config, logger, incremental=False):
-    """Perform the actual update with lock held."""
+    """Perform the actual update with lock held.
+
+    Uses a producer-consumer pattern with a bounded queue to limit memory usage.
+    Fetch threads produce data into the queue, and a single writer thread
+    consumes from the queue and writes to the database.
+    """
     db_name = generate_db_name()
     db_path = db_dir / db_name
 
@@ -147,12 +160,82 @@ def _do_update(client, experiments, db_dir, config, logger, incremental=False):
             logger.info("No existing database found, creating fresh database")
 
     logger.info(f"Using database: {db_path}")
-    db = Database(db_path)
 
-    def fetch_experiment_data(exp_id):
-        """Fetch all data for an experiment (thread-safe, no DB access)."""
+    # Bounded queue limits memory usage - blocks when full (backpressure)
+    data_queue = queue.Queue(maxsize=config.queue_size)
+    stop_event = Event()
+    error_holder = []  # To propagate writer errors
+    counter_lock = Lock()
+    success_count = 0
+    error_count = 0
+
+    def writer_thread():
+        """Single thread that handles all database writes."""
+        nonlocal success_count, error_count
+        db = Database(db_path)
+        db.enable_wal_mode()
+        batch_count = 0
+
         try:
-            return {
+            while True:
+                try:
+                    data = data_queue.get(timeout=0.5)
+                except queue.Empty:
+                    if stop_event.is_set():
+                        break
+                    continue
+
+                if data is None:  # Sentinel value signals completion
+                    break
+
+                exp_id = data["experiment_id"]
+
+                if "error" in data:
+                    with counter_lock:
+                        error_count += 1
+                    data_queue.task_done()
+                    continue
+
+                try:
+                    if incremental:
+                        db.delete_experiment(exp_id)
+
+                    db.insert_experiment_batch(data)
+                    batch_count += 1
+
+                    if batch_count >= config.batch_commit_size:
+                        db.commit()
+                        batch_count = 0
+
+                    with counter_lock:
+                        success_count += 1
+
+                except Exception as e:
+                    logger.warning(f"Error writing {exp_id}: {e}")
+                    with counter_lock:
+                        error_count += 1
+
+                data_queue.task_done()
+
+            # Final commit for remaining batch
+            if batch_count > 0:
+                db.commit()
+
+        except Exception as e:
+            error_holder.append(e)
+        finally:
+            db.set_metadata("last_update", datetime.now().isoformat())
+            db.set_metadata("hours_lookback", str(config.hours_lookback))
+            db.close()
+
+    # Start writer thread
+    writer = Thread(target=writer_thread, daemon=True)
+    writer.start()
+
+    def fetch_and_queue(exp_id):
+        """Fetch experiment data and put in queue (blocks if queue full)."""
+        try:
+            data = {
                 "experiment_id": exp_id,
                 "info": fetch_experiment_info(client, exp_id),
                 "logbook": fetch_logbook(client, exp_id),
@@ -163,13 +246,15 @@ def _do_update(client, experiments, db_dir, config, logger, incremental=False):
             }
         except Exception as e:
             logger.warning(f"Error fetching {exp_id}: {e}")
-            return {"experiment_id": exp_id, "error": str(e)}
+            data = {"experiment_id": exp_id, "error": str(e)}
 
-    # Phase 1: Fetch data in parallel (network I/O bound)
-    results = []
+        data_queue.put(data)  # Blocks if queue full - natural backpressure
+        return exp_id
+
+    # Fetch in parallel with progress bar
     if config.parallel_jobs > 1:
         with ThreadPoolExecutor(max_workers=config.parallel_jobs) as executor:
-            futures = {executor.submit(fetch_experiment_data, exp): exp for exp in experiments}
+            futures = {executor.submit(fetch_and_queue, exp): exp for exp in experiments}
 
             with click.progressbar(
                 as_completed(futures),
@@ -177,49 +262,19 @@ def _do_update(client, experiments, db_dir, config, logger, incremental=False):
                 label="Fetching experiments",
             ) as completed:
                 for future in completed:
-                    results.append(future.result())
+                    future.result()  # Propagate any exceptions
     else:
         with click.progressbar(experiments, label="Fetching experiments") as exps:
             for exp_id in exps:
-                results.append(fetch_experiment_data(exp_id))
+                fetch_and_queue(exp_id)
 
-    # Phase 2: Write to database sequentially (fast, avoids thread safety issues)
-    success_count = 0
-    error_count = 0
+    # Signal writer to finish
+    stop_event.set()
+    data_queue.put(None)  # Sentinel value
+    writer.join(timeout=300)  # Wait up to 5 minutes for writer to finish
 
-    for data in results:
-        exp_id = data["experiment_id"]
-        if "error" in data:
-            error_count += 1
-            continue
-
-        try:
-            if incremental:
-                db.delete_experiment(exp_id)
-
-            if data["info"]:
-                db.insert_experiment(data["info"])
-            if data["logbook"]:
-                db.insert_logbook(data["logbook"])
-            if data["runtable"]:
-                db.insert_runtable(data["runtable"])
-            if data["file_manager"]:
-                db.insert_file_manager(data["file_manager"])
-            if data["questionnaire"]:
-                db.insert_questionnaire(data["questionnaire"])
-            if data["workflow"]:
-                db.insert_workflow(data["workflow"])
-
-            success_count += 1
-        except Exception as e:
-            logger.warning(f"Error writing {exp_id}: {e}")
-            error_count += 1
-
-    # Set metadata
-    db.set_metadata("last_update", datetime.now().isoformat())
-    db.set_metadata("hours_lookback", str(config.hours_lookback))
-
-    db.close()
+    if error_holder:
+        raise error_holder[0]
 
     logger.info(f"Update complete: {success_count} succeeded, {error_count} failed")
     logger.info(f"Database saved to: {db_path}")

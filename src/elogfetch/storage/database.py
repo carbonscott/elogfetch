@@ -59,6 +59,20 @@ class Database:
         self._detector_cache: dict[str, int] = {}
         self._create_tables()
 
+    def enable_wal_mode(self) -> None:
+        """Enable Write-Ahead Logging for better write performance.
+
+        This allows reads to proceed concurrently with writes and
+        improves write performance for batch operations.
+        """
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA synchronous=NORMAL")
+        self.conn.execute("PRAGMA cache_size=-64000")  # 64MB cache
+
+    def commit(self) -> None:
+        """Explicit commit for batch operations."""
+        self.conn.commit()
+
     def _create_tables(self):
         """Create all required tables."""
         self.conn.executescript("""
@@ -241,6 +255,11 @@ class Database:
 
     def insert_experiment(self, data: dict[str, Any]) -> None:
         """Insert or update experiment data."""
+        self._insert_experiment_no_commit(data)
+        self.conn.commit()
+
+    def _insert_experiment_no_commit(self, data: dict[str, Any]) -> None:
+        """Insert experiment without committing (for batch operations)."""
         self.conn.execute(
             """
             INSERT OR REPLACE INTO Experiment
@@ -263,11 +282,15 @@ class Database:
                 data.get("urawi_proposal"),
             ),
         )
-        self.conn.commit()
         logger.debug(f"Inserted experiment: {data.get('experiment_id')}")
 
     def insert_questionnaire(self, data: dict[str, Any]) -> None:
         """Insert questionnaire data as individual field records."""
+        self._insert_questionnaire_no_commit(data)
+        self.conn.commit()
+
+    def _insert_questionnaire_no_commit(self, data: dict[str, Any]) -> None:
+        """Insert questionnaire without committing (for batch operations)."""
         experiment_id = data.get("experiment_id")
         proposal_number = data.get("proposal_number")
         fields = data.get("fields", [])
@@ -298,11 +321,15 @@ class Database:
                 ),
             )
 
-        self.conn.commit()
         logger.debug(f"Inserted {len(fields)} questionnaire fields for: {experiment_id}")
 
     def insert_workflow(self, data: dict[str, Any]) -> None:
         """Insert workflow definitions."""
+        self._insert_workflow_no_commit(data)
+        self.conn.commit()
+
+    def _insert_workflow_no_commit(self, data: dict[str, Any]) -> None:
+        """Insert workflow without committing (for batch operations)."""
         experiment_id = data.get("experiment_id")
 
         # Delete existing workflows for this experiment
@@ -333,11 +360,15 @@ class Database:
                 ),
             )
 
-        self.conn.commit()
         logger.debug(f"Inserted {len(data.get('workflows', []))} workflows for: {experiment_id}")
 
     def insert_logbook(self, entries: list[dict[str, Any]]) -> None:
         """Insert logbook entries."""
+        self._insert_logbook_no_commit(entries)
+        self.conn.commit()
+
+    def _insert_logbook_no_commit(self, entries: list[dict[str, Any]]) -> None:
+        """Insert logbook without committing (for batch operations)."""
         if not entries:
             return
 
@@ -371,11 +402,15 @@ class Database:
                 ),
             )
 
-        self.conn.commit()
         logger.debug(f"Inserted {len(entries)} logbook entries for: {experiment_id}")
 
     def insert_runtable(self, data: dict[str, Any]) -> None:
         """Insert run table data."""
+        self._insert_runtable_no_commit(data)
+        self.conn.commit()
+
+    def _insert_runtable_no_commit(self, data: dict[str, Any]) -> None:
+        """Insert runtable without committing (for batch operations)."""
         experiment_id = data.get("experiment_id")
 
         for run_data in data.get("data_production", []):
@@ -462,11 +497,15 @@ class Database:
                     (run_id, detector_id, value),
                 )
 
-        self.conn.commit()
         logger.debug(f"Inserted runtable for: {experiment_id}")
 
     def insert_file_manager(self, data: dict[str, Any]) -> None:
         """Insert file manager data (number_of_files, total_size_bytes per run)."""
+        self._insert_file_manager_no_commit(data)
+        self.conn.commit()
+
+    def _insert_file_manager_no_commit(self, data: dict[str, Any]) -> None:
+        """Insert file manager without committing (for batch operations)."""
         experiment_id = data.get("experiment_id")
         records = data.get("file_manager_records", [])
 
@@ -514,16 +553,42 @@ class Database:
                     ),
                 )
 
-        self.conn.commit()
         logger.debug(f"Inserted file manager data for: {experiment_id}")
+
+    def insert_experiment_batch(self, data: dict[str, Any]) -> None:
+        """Insert all data for an experiment without committing.
+
+        This is used by the streaming pipeline for batch commits.
+        Call commit() after inserting multiple experiments.
+
+        Args:
+            data: Dictionary containing experiment_id and all data types:
+                  info, logbook, runtable, file_manager, questionnaire, workflow
+        """
+        if data.get("info"):
+            self._insert_experiment_no_commit(data["info"])
+        if data.get("logbook"):
+            self._insert_logbook_no_commit(data["logbook"])
+        if data.get("runtable"):
+            self._insert_runtable_no_commit(data["runtable"])
+        if data.get("file_manager"):
+            self._insert_file_manager_no_commit(data["file_manager"])
+        if data.get("questionnaire"):
+            self._insert_questionnaire_no_commit(data["questionnaire"])
+        if data.get("workflow"):
+            self._insert_workflow_no_commit(data["workflow"])
 
     def set_metadata(self, key: str, value: str) -> None:
         """Set a metadata value."""
+        self._set_metadata_no_commit(key, value)
+        self.conn.commit()
+
+    def _set_metadata_no_commit(self, key: str, value: str) -> None:
+        """Set metadata without committing (for batch operations)."""
         self.conn.execute(
             "INSERT OR REPLACE INTO Metadata (key, value) VALUES (?, ?)",
             (key, value),
         )
-        self.conn.commit()
 
     def get_metadata(self, key: str) -> str | None:
         """Get a metadata value."""

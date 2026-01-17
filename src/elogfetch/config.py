@@ -25,6 +25,8 @@ class Config:
 
     # Execution settings
     parallel_jobs: int = 10
+    queue_size: int = 100  # Bounded queue for memory-efficient streaming
+    batch_commit_size: int = 50  # Experiments per commit batch
 
     # Paths
     database_dir: Path | None = None
@@ -71,6 +73,10 @@ class Config:
             config.exclude_patterns = data["exclude_patterns"]
         if "parallel_jobs" in data:
             config.parallel_jobs = int(data["parallel_jobs"])
+        if "queue_size" in data:
+            config.queue_size = int(data["queue_size"])
+        if "batch_commit_size" in data:
+            config.batch_commit_size = int(data["batch_commit_size"])
         if "database_dir" in data:
             config.database_dir = Path(data["database_dir"]).expanduser()
         if "lock_timeout" in data:
@@ -105,6 +111,10 @@ class Config:
             config.exclude_patterns = cli_args["exclude"]
         if cli_args.get("parallel_jobs") is not None:
             config.parallel_jobs = int(cli_args["parallel_jobs"])
+        if cli_args.get("queue_size") is not None:
+            config.queue_size = int(cli_args["queue_size"])
+        if cli_args.get("batch_commit_size") is not None:
+            config.batch_commit_size = int(cli_args["batch_commit_size"])
         if cli_args.get("database_dir"):
             config.database_dir = Path(cli_args["database_dir"]).expanduser()
 
