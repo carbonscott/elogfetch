@@ -12,16 +12,19 @@ build/
 venv/
 ENV/
 
+# Environment config
+.env
+
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# fetch-elog specific
+# elogfetch specific
 *.db
 elog_*.db
-.fetch_elog.lock
+.elogfetch.lock
 
 # OS
 .DS_Store

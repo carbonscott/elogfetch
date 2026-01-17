@@ -1,4 +1,4 @@
-"""Command-line interface for fetch-elog."""
+"""Command-line interface for elogfetch."""
 
 from __future__ import annotations
 
@@ -27,13 +27,13 @@ from .storage import Database, find_latest_database, generate_db_name
 from .utils import acquire_lock, get_logger, setup_logging
 
 
-@click.group()
+@click.group(context_settings={"help_option_names": ["-h", "--help"]})
 @click.option("--config", "-c", type=click.Path(exists=True), help="Config file path")
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output")
 @click.option("--quiet", "-q", is_flag=True, help="Quiet mode (errors only)")
 @click.pass_context
 def cli(ctx, config, verbose, quiet):
-    """fetch-elog: Fetch LCLS experiment data from the electronic logbook."""
+    """elogfetch: Fetch LCLS experiment data from the electronic logbook."""
     ctx.ensure_object(dict)
 
     # Setup logging
@@ -54,7 +54,7 @@ def cli(ctx, config, verbose, quiet):
 
 
 @cli.command()
-@click.option("--hours", "-h", type=float, help="Hours to look back (default: from config)")
+@click.option("--hours", "-H", type=float, help="Hours to look back (default: from config)")
 @click.option("--exclude", "-e", multiple=True, help="Patterns to exclude (e.g., -e 'txi*')")
 @click.option("--output-dir", "-o", type=click.Path(), help="Output directory for database")
 @click.option("--dry-run", is_flag=True, help="Show what would be done without making changes")
@@ -115,7 +115,7 @@ def update(ctx, hours, exclude, output_dir, dry_run, parallel, incremental):
             return
 
         # Acquire lock
-        lock_path = db_dir / ".fetch_elog.lock"
+        lock_path = db_dir / ".elogfetch.lock"
         try:
             with acquire_lock(lock_path):
                 _do_update(client, experiments, db_dir, config, logger, incremental)
@@ -313,7 +313,7 @@ def status(ctx, database_dir):
 
     if not db_path:
         click.echo("No database found.")
-        click.echo(f"Run 'fetch-elog update' to create one.")
+        click.echo(f"Run 'elogfetch update' to create one.")
         return
 
     click.echo(f"Database: {db_path}")
@@ -342,7 +342,7 @@ def status(ctx, database_dir):
 
 
 @cli.command()
-@click.option("--hours", "-h", type=float, default=168, help="Hours to look back (default: 168)")
+@click.option("--hours", "-H", type=float, default=168, help="Hours to look back (default: 168)")
 @click.option("--exclude", "-e", multiple=True, help="Patterns to exclude")
 @click.pass_context
 def list_experiments(ctx, hours, exclude):

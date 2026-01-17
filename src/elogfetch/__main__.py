@@ -1,4 +1,4 @@
-"""Entry point for running fetch-elog as a module."""
+"""Entry point for running elogfetch as a module."""
 
 from .cli import main
 

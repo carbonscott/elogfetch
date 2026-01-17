@@ -1,5 +1,5 @@
 #!/bin/bash
-# Periodic update wrapper for fetch-elog
+# Periodic update wrapper for elogfetch
 # Copy this file to your working directory and customize the configuration below.
 #
 # Handles: frequency checking, deployment, logging
@@ -14,8 +14,8 @@ set -e
 # ============================================================
 # Configuration - EDIT THESE FOR YOUR ENVIRONMENT
 # ============================================================
-# Path to fetch-elog command (default: find in PATH)
-FETCH_ELOG="${FETCH_ELOG:-fetch-elog}"
+# Path to elogfetch command (default: find in PATH)
+ELOGFETCH="${ELOGFETCH:-elogfetch}"
 
 # Directory for database files (default: current directory)
 DB_DIR="${DB_DIR:-$(pwd)}"
@@ -60,7 +60,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --dry-run      Show what would be done without making changes"
             echo ""
             echo "Environment variables:"
-            echo "  FETCH_ELOG              Path to fetch-elog command"
+            echo "  ELOGFETCH              Path to elogfetch command"
             echo "  DB_DIR                  Directory for database files"
             echo "  DEPLOY_PATH             Path to deploy database (optional)"
             echo "  UPDATE_FREQUENCY_HOURS  Hours between updates (default: 6)"
@@ -122,12 +122,12 @@ log "========================================"
 log "Periodic Update Starting"
 log "========================================"
 log "DB_DIR: $DB_DIR"
-log "FETCH_ELOG: $FETCH_ELOG"
+log "ELOGFETCH: $ELOGFETCH"
 
-# Verify fetch-elog is available
-if ! command -v "$FETCH_ELOG" &> /dev/null; then
-    log "ERROR: fetch-elog command not found: $FETCH_ELOG"
-    log "Make sure fetch-elog is installed and in your PATH, or set FETCH_ELOG"
+# Verify elogfetch is available
+if ! command -v "$ELOGFETCH" &> /dev/null; then
+    log "ERROR: elogfetch command not found: $ELOGFETCH"
+    log "Make sure elogfetch is installed and in your PATH, or set ELOGFETCH"
     exit 1
 fi
 
@@ -145,7 +145,7 @@ fi
 # Dry run mode
 if [[ "$DRY_RUN" == "true" ]]; then
     log "DRY RUN MODE - would execute:"
-    log "  $FETCH_ELOG update --incremental --hours $HOURS_LOOKBACK --parallel $PARALLEL_JOBS --output-dir $DB_DIR"
+    log "  $ELOGFETCH update --incremental --hours $HOURS_LOOKBACK --parallel $PARALLEL_JOBS --output-dir $DB_DIR"
     if [[ -n "$EXCLUDE_PATTERNS" ]]; then
         for pattern in $EXCLUDE_PATTERNS; do
             log "    --exclude '$pattern'"
@@ -165,9 +165,9 @@ if [[ -n "$EXCLUDE_PATTERNS" ]]; then
     done
 fi
 
-# Run fetch-elog update
-log "Running fetch-elog update..."
-eval "$FETCH_ELOG update --incremental --hours $HOURS_LOOKBACK --parallel $PARALLEL_JOBS --output-dir $DB_DIR $EXCLUDE_ARGS"
+# Run elogfetch update
+log "Running elogfetch update..."
+eval "$ELOGFETCH update --incremental --hours $HOURS_LOOKBACK --parallel $PARALLEL_JOBS --output-dir $DB_DIR $EXCLUDE_ARGS"
 
 # Find the newly created database
 NEW_DB=$(find_latest_db)

@@ -1,4 +1,4 @@
-"""Database storage for fetch-elog."""
+"""Database storage for elogfetch."""
 
 from __future__ import annotations
 

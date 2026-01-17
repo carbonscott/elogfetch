@@ -1,4 +1,4 @@
-"""Utility functions for fetch-elog."""
+"""Utility functions for elogfetch."""
 
 from __future__ import annotations
 

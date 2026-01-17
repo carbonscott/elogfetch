@@ -57,7 +57,7 @@ Instead of editing the script, you can override settings via environment variabl
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `FETCH_ELOG` | `fetch-elog` | Path to fetch-elog command |
+| `ELOGFETCH` | `elogfetch` | Path to elogfetch command |
 | `DB_DIR` | Current directory | Directory for database files |
 | `DEPLOY_PATH` | (empty) | Path to deploy database |
 | `UPDATE_FREQUENCY_HOURS` | `6` | Skip if updated within N hours |
@@ -90,7 +90,7 @@ mkdir -p ~/elog-production
 cd ~/elog-production
 
 # Copy and customize the script
-cp /path/to/fetch-elog/examples/periodic_update.sh .
+cp /path/to/elogfetch/examples/periodic_update.sh .
 
 # Edit configuration
 vim periodic_update.sh

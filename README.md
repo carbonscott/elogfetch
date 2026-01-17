@@ -1,26 +1,42 @@
-# fetch-elog
+# elogfetch
 
 Fetch LCLS experiment data from the electronic logbook (elog) system and store it in a local SQLite database.
 
 ## Installation
 
-Using uv with SLAC conda environment:
+This package requires `krtc` which is only available in SLAC conda environments.
+
+### Setup
+
+1. Create a `.env` file from the template:
 ```bash
-export UV_CACHE_DIR=/sdf/data/lcls/ds/prj/prjdat21/results/cwang31/.UV_CACHE
-cd /sdf/data/lcls/ds/prj/prjcwang31/results/fetch-elog
-uv pip install -e . --python /sdf/scratch/users/c/cwang31/miniconda/ana-4.0.59-torch/bin/python
+cp .env.example .env
 ```
 
-Or with pip in an environment that has `krtc`:
+2. Edit `.env` to set paths for your environment (`UV_CACHE_DIR` and `UV_PYTHON`)
+
+3. Create a virtual environment and install:
 ```bash
-pip install -e .
+set -a; source .env; set +a
+uv venv --python $UV_PYTHON --system-site-packages
+unset UV_PYTHON  # so uv pip targets .venv, not the conda env
+uv pip install -e .
+```
+
+4. Activate the environment:
+```bash
+source .venv/bin/activate
+```
+
+### Available conda environments with krtc
+```bash
+ls /sdf/group/lcls/ds/ana/sw/conda1/inst/envs/
 ```
 
 ## Prerequisites
 
 - Valid Kerberos ticket for SLAC authentication
-- Python 3.9+
-- `krtc` package (SLAC-specific, not on PyPI - available in SLAC conda environments)
+- Python 3.9+ (from a SLAC conda environment with `krtc`)
 
 Before using, authenticate with Kerberos:
 ```bash
@@ -31,37 +47,37 @@ kinit
 
 ### Check status
 ```bash
-fetch-elog status
+elogfetch status
 ```
 
 ### Update database with recent experiments
 ```bash
 # Fetch experiments updated in the last 24 hours
-fetch-elog update --hours 24
+elogfetch update --hours 24
 
 # Dry run to see what would be fetched
-fetch-elog update --hours 24 --dry-run
+elogfetch update --hours 24 --dry-run
 
 # Exclude certain experiments
-fetch-elog update --hours 24 --exclude 'txi*' --exclude 'test*'
+elogfetch update --hours 24 --exclude 'txi*' --exclude 'test*'
 
 # Specify output directory
-fetch-elog update --hours 168 --output-dir /path/to/data
+elogfetch update --hours 168 --output-dir /path/to/data
 ```
 
 ### Fetch a specific experiment
 ```bash
-fetch-elog fetch mfxl1033223
+elogfetch fetch mfxl1033223
 ```
 
 ### List recently updated experiments
 ```bash
-fetch-elog list-experiments --hours 72
+elogfetch list-experiments --hours 72
 ```
 
 ## Configuration
 
-Create a config file at `~/.config/fetch-elog/config.yaml`:
+Create a config file at `~/.config/elogfetch/config.yaml`:
 
 ```yaml
 hours_lookback: 168

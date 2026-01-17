@@ -1,4 +1,4 @@
-"""File locking utilities for fetch-elog."""
+"""File locking utilities for elogfetch."""
 
 from __future__ import annotations
 

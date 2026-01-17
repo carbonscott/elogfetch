@@ -1,4 +1,4 @@
-"""Logging setup for fetch-elog."""
+"""Logging setup for elogfetch."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import logging
 import sys
 from pathlib import Path
 
-LOGGER_NAME = "fetch_elog"
+LOGGER_NAME = "elogfetch"
 
 
 def setup_logging(
@@ -49,5 +49,5 @@ def setup_logging(
 
 
 def get_logger() -> logging.Logger:
-    """Get the fetch-elog logger instance."""
+    """Get the elogfetch logger instance."""
     return logging.getLogger(LOGGER_NAME)

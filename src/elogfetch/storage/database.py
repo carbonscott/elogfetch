@@ -1,4 +1,4 @@
-"""SQLite database operations for fetch-elog."""
+"""SQLite database operations for elogfetch."""
 
 from __future__ import annotations
 

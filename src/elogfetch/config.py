@@ -1,4 +1,4 @@
-"""Configuration management for fetch-elog."""
+"""Configuration management for elogfetch."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ DB_PATTERN = re.compile(r"^elog_(\d{4})_(\d{4})_(\d{4})\.db$")
 
 @dataclass
 class Config:
-    """Configuration for fetch-elog."""
+    """Configuration for elogfetch."""
 
     # Fetch settings
     hours_lookback: float = 168.0  # 7 days default

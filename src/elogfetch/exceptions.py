@@ -1,10 +1,10 @@
-"""Custom exceptions for fetch-elog."""
+"""Custom exceptions for elogfetch."""
 
 from __future__ import annotations
 
 
 class FetchElogError(Exception):
-    """Base exception for fetch-elog."""
+    """Base exception for elogfetch."""
 
     pass
 

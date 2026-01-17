@@ -1,4 +1,4 @@
-"""fetch-elog: Fetch LCLS experiment data from the electronic logbook."""
+"""elogfetch: Fetch LCLS experiment data from the electronic logbook."""
 
 from __future__ import annotations
 

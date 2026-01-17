@@ -1,1 +1,1 @@
-"""Tests for fetch-elog."""
+"""Tests for elogfetch."""

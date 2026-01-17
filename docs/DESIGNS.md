@@ -1,8 +1,8 @@
-# fetch-elog: Design Document
+# elogfetch: Design Document
 
 ## Overview
 
-`fetch-elog` is a Python package for fetching LCLS experiment data from the electronic logbook (elog) system and storing it in a local SQLite database. It is designed to be run by individual users, with each user maintaining their own database containing only the experiments they are authorized to access.
+`elogfetch` is a Python package for fetching LCLS experiment data from the electronic logbook (elog) system and storing it in a local SQLite database. It is designed to be run by individual users, with each user maintaining their own database containing only the experiments they are authorized to access.
 
 ## Goals
 
@@ -18,7 +18,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                              fetch-elog                                  │
+│                              elogfetch                                  │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
 │  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────────┐   │
@@ -45,11 +45,11 @@
 ## Module Structure
 
 ```
-fetch-elog/
+elogfetch/
 ├── docs/
 │   └── DESIGNS.md              # This document
 ├── src/
-│   └── fetch_elog/
+│   └── elogfetch/
 │       ├── __init__.py
 │       ├── cli.py              # Command-line interface (click)
 │       ├── config.py           # Configuration loading (YAML + env + CLI)
@@ -120,7 +120,7 @@ from pathlib import Path
 class FetchSession:
     def __init__(self, work_dir: Path = None):
         if work_dir is None:
-            self._temp_dir = tempfile.TemporaryDirectory(prefix="fetch_elog_")
+            self._temp_dir = tempfile.TemporaryDirectory(prefix="elogfetch_")
             self.work_dir = Path(self._temp_dir.name)
         else:
             self._temp_dir = None
@@ -270,7 +270,7 @@ def setup_logging(
 ) -> logging.Logger:
     """Configure logging for the application."""
 
-    logger = logging.getLogger("fetch_elog")
+    logger = logging.getLogger("elogfetch")
     logger.setLevel(level)
 
     formatter = logging.Formatter(
@@ -293,7 +293,7 @@ def setup_logging(
 
 All modules use:
 ```python
-logger = logging.getLogger("fetch_elog")
+logger = logging.getLogger("elogfetch")
 ```
 
 ---
@@ -308,7 +308,7 @@ Using `click` for clean command-line interface:
 @click.option('--verbose', '-v', is_flag=True, help='Verbose output')
 @click.pass_context
 def cli(ctx, config, verbose):
-    """fetch-elog: Fetch LCLS experiment data."""
+    """elogfetch: Fetch LCLS experiment data."""
     ctx.ensure_object(dict)
     ctx.obj['config'] = Config.load(config_file=config)
     ctx.obj['verbose'] = verbose
@@ -342,16 +342,16 @@ def status(ctx):
 **Usage**:
 ```bash
 # Update database
-fetch-elog update --hours 24
+elogfetch update --hours 24
 
 # Force update
-fetch-elog update --force
+elogfetch update --force
 
 # Check status
-fetch-elog status
+elogfetch status
 
 # Fetch specific experiment
-fetch-elog fetch mfx12345
+elogfetch fetch mfx12345
 ```
 
 ---
@@ -360,7 +360,7 @@ fetch-elog fetch mfx12345
 
 ```python
 class FetchElogError(Exception):
-    """Base exception for fetch-elog."""
+    """Base exception for elogfetch."""
     pass
 
 class AuthenticationError(FetchElogError):
@@ -402,7 +402,7 @@ The design inherently supports multi-user operation:
 
 **Recommended setup per user**:
 ```yaml
-# ~/.config/fetch-elog/config.yaml
+# ~/.config/elogfetch/config.yaml
 database_path: ~/experiments/elog.db
 hours_lookback: 168
 update_frequency_hours: 12
@@ -514,9 +514,9 @@ def test_find_latest_database(tmp_path):
 
 Users of the current `periodic_update.py` can migrate by:
 
-1. Install new package: `pip install fetch-elog`
+1. Install new package: `pip install elogfetch`
 2. Create config file from existing YAML
-3. Run initial sync: `fetch-elog update --hours 720` (30 days)
+3. Run initial sync: `elogfetch update --hours 720` (30 days)
 4. Set up cron with new command
 
 The database schema is different, so existing `.db` files are not compatible. A fresh sync is required.

@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fetch-elog"
+name = "elogfetch"
 version = "0.1.0"
 description = "Fetch LCLS experiment data from the electronic logbook"
 readme = "README.md"
@@ -25,8 +25,8 @@ dependencies = [
     "click>=8.0",
     "requests>=2.25",
     "pyyaml>=6.0",
-    # krtc is a SLAC-specific package, not on PyPI
-    # It must be available in the environment (e.g., via SLAC conda)
+    # krtc requires pykerberos which needs system Kerberos headers to compile.
+    # Use UV_PYTHON to point to a conda environment that has krtc pre-installed.
 ]
 
 [project.optional-dependencies]
@@ -38,7 +38,7 @@ dev = [
 ]
 
 [project.scripts]
-fetch-elog = "fetch_elog.cli:main"
+elogfetch = "elogfetch.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/slaclab/fetch-elog"
