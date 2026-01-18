@@ -247,12 +247,14 @@ def _do_update(client, experiments, db_dir, config, logger, incremental=None):
         except Exception as e:
             error_holder.append(e)
         finally:
-            db.set_metadata("last_update", datetime.now().isoformat())
-            db.set_metadata("hours_lookback", str(config.hours_lookback))
-            db.close()
+            try:
+                db.set_metadata("last_update", datetime.now().isoformat())
+                db.set_metadata("hours_lookback", str(config.hours_lookback))
+            finally:
+                db.close()
 
-    # Start writer thread
-    writer = Thread(target=writer_thread, daemon=True)
+    # Start writer thread (non-daemon ensures finally block runs on exit)
+    writer = Thread(target=writer_thread)
     writer.start()
 
     def fetch_and_queue(exp_id):
