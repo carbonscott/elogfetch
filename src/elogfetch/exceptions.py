@@ -26,6 +26,12 @@ class APIError(FetchElogError):
         self.response = response
 
 
+class TransientError(APIError):
+    """Transient error that may succeed on retry (5xx, network timeout)."""
+
+    pass
+
+
 class DatabaseError(FetchElogError):
     """Database operation failed."""
 

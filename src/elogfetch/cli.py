@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import queue
 import shutil
@@ -61,8 +62,9 @@ def cli(ctx, config, verbose, quiet):
 @click.option("--output-dir", "-o", type=click.Path(), help="Output directory for database")
 @click.option("--dry-run", is_flag=True, help="Show what would be done without making changes")
 @click.option("--parallel", "-p", type=int, help="Number of parallel jobs")
-@click.option("--incremental", "-i", is_flag=True,
-              help="Update existing database incrementally (default: create fresh)")
+@click.option("--incremental", "-i", type=click.Path(), default=None,
+              is_flag=False, flag_value="AUTO",
+              help="Update existing database incrementally. Optionally specify base database path.")
 @click.option("--queue-size", "-q", type=int, help="Queue size for streaming (default: 100)")
 @click.option("--batch-size", "-b", type=int, help="Experiments per commit batch (default: 50)")
 @click.pass_context
@@ -140,19 +142,32 @@ def update(ctx, hours, exclude, output_dir, dry_run, parallel, incremental, queu
         sys.exit(1)
 
 
-def _do_update(client, experiments, db_dir, config, logger, incremental=False):
+def _do_update(client, experiments, db_dir, config, logger, incremental=None):
     """Perform the actual update with lock held.
 
     Uses a producer-consumer pattern with a bounded queue to limit memory usage.
     Fetch threads produce data into the queue, and a single writer thread
     consumes from the queue and writes to the database.
+
+    Args:
+        incremental: None for fresh database, "AUTO" to find latest database,
+                     or a path string to use a specific database as base.
+
+    Returns:
+        Tuple of (success_count, failed_experiments list)
     """
     db_name = generate_db_name()
     db_path = db_dir / db_name
 
     if incremental:
-        # Find existing database and copy it
-        existing_db = find_latest_database(db_dir)
+        # Determine base database
+        if incremental == "AUTO":
+            existing_db = find_latest_database(db_dir)
+        else:
+            existing_db = Path(incremental)
+            if not existing_db.exists():
+                raise FetchElogError(f"Base database not found: {existing_db}")
+
         if existing_db:
             logger.info(f"Incremental mode: copying {existing_db} -> {db_path}")
             shutil.copy2(existing_db, db_path)
@@ -167,11 +182,11 @@ def _do_update(client, experiments, db_dir, config, logger, incremental=False):
     error_holder = []  # To propagate writer errors
     counter_lock = Lock()
     success_count = 0
-    error_count = 0
+    failed_experiments = []
 
     def writer_thread():
         """Single thread that handles all database writes."""
-        nonlocal success_count, error_count
+        nonlocal success_count
         db = Database(db_path)
         db.enable_wal_mode()
         batch_count = 0
@@ -192,7 +207,11 @@ def _do_update(client, experiments, db_dir, config, logger, incremental=False):
 
                 if "error" in data:
                     with counter_lock:
-                        error_count += 1
+                        failed_experiments.append({
+                            "experiment_id": exp_id,
+                            "error": data["error"],
+                            "timestamp": datetime.now().isoformat(),
+                        })
                     data_queue.task_done()
                     continue
 
@@ -213,7 +232,11 @@ def _do_update(client, experiments, db_dir, config, logger, incremental=False):
                 except Exception as e:
                     logger.warning(f"Error writing {exp_id}: {e}")
                     with counter_lock:
-                        error_count += 1
+                        failed_experiments.append({
+                            "experiment_id": exp_id,
+                            "error": str(e),
+                            "timestamp": datetime.now().isoformat(),
+                        })
 
                 data_queue.task_done()
 
@@ -276,8 +299,18 @@ def _do_update(client, experiments, db_dir, config, logger, incremental=False):
     if error_holder:
         raise error_holder[0]
 
+    error_count = len(failed_experiments)
     logger.info(f"Update complete: {success_count} succeeded, {error_count} failed")
     logger.info(f"Database saved to: {db_path}")
+
+    # Write failed experiments to JSON file if any
+    if failed_experiments:
+        failed_file = db_dir / "failed_experiments.json"
+        with open(failed_file, "w") as f:
+            json.dump(failed_experiments, f, indent=2)
+        logger.warning(f"Wrote {error_count} failed experiments to: {failed_file}")
+
+    return success_count, failed_experiments
 
 
 @cli.command()
@@ -428,6 +461,79 @@ def list_experiments(ctx, hours, exclude):
 
     except AuthenticationError as e:
         logger.error(str(e))
+        sys.exit(1)
+    except FetchElogError as e:
+        logger.error(f"Error: {e}")
+        sys.exit(1)
+
+
+@cli.command()
+@click.option("--file", "-f", type=click.Path(exists=True), help="Path to failed_experiments.json")
+@click.option("--output-dir", "-o", type=click.Path(), help="Output directory for database")
+@click.option("--parallel", "-p", type=int, help="Number of parallel jobs")
+@click.pass_context
+def retry(ctx, file, output_dir, parallel):
+    """Retry fetching failed experiments from a previous run."""
+    logger = ctx.obj["logger"]
+    config = ctx.obj["config"]
+
+    # Apply CLI overrides
+    cli_args = {}
+    if parallel is not None:
+        cli_args["parallel_jobs"] = parallel
+    if output_dir:
+        cli_args["database_dir"] = output_dir
+
+    config = Config.load(cli_args=cli_args)
+
+    # Determine directories
+    db_dir = config.database_dir or Path.cwd()
+    db_dir = Path(db_dir)
+
+    # Find failed experiments file
+    if file:
+        failed_file = Path(file)
+    else:
+        failed_file = db_dir / "failed_experiments.json"
+
+    if not failed_file.exists():
+        logger.error(f"Failed experiments file not found: {failed_file}")
+        sys.exit(1)
+
+    try:
+        with open(failed_file) as f:
+            failed_data = json.load(f)
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in {failed_file}: {e}")
+        sys.exit(1)
+
+    # Extract experiment IDs
+    experiments = [entry["experiment_id"] for entry in failed_data]
+
+    if not experiments:
+        logger.info("No failed experiments to retry.")
+        return
+
+    logger.info(f"Retrying {len(experiments)} failed experiments...")
+
+    try:
+        client = ElogClient(
+            base_url=config.base_url,
+            kerberos_principal=config.kerberos_principal,
+        )
+
+        # Acquire lock
+        lock_path = db_dir / ".elogfetch.lock"
+        try:
+            with acquire_lock(lock_path):
+                _do_update(client, experiments, db_dir, config, logger, incremental="AUTO")
+        except LockError as e:
+            logger.error(str(e))
+            sys.exit(1)
+
+    except AuthenticationError as e:
+        logger.error(str(e))
+        logger.error("Please run 'kinit' to authenticate.")
         sys.exit(1)
     except FetchElogError as e:
         logger.error(f"Error: {e}")

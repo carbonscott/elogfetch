@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import subprocess
+import time
 from typing import Any
 
 import requests
 from krtc import KerberosTicket
 
-from ..exceptions import APIError, AuthenticationError
+from ..exceptions import APIError, AuthenticationError, TransientError
 from ..utils import get_logger
 
 logger = get_logger()
@@ -16,6 +17,12 @@ logger = get_logger()
 # Default values (can be overridden via Config)
 DEFAULT_BASE_URL = "https://pswww.slac.stanford.edu"
 DEFAULT_KERBEROS_PRINCIPAL = "HTTP@pswww.slac.stanford.edu"
+
+# Retry configuration
+RETRY_MAX_ATTEMPTS = 3
+RETRY_BASE_DELAY = 2.0
+REQUEST_TIMEOUT = 30
+TRANSIENT_STATUS_CODES = {500, 502, 503, 504}
 
 
 class ElogClient:
@@ -79,7 +86,7 @@ class ElogClient:
         params: dict[str, Any] | None = None,
         require_auth: bool = True,
     ) -> dict[str, Any]:
-        """Make a GET request to the API.
+        """Make a GET request to the API with retry logic.
 
         Args:
             endpoint: API endpoint (relative to base URL)
@@ -90,43 +97,80 @@ class ElogClient:
             JSON response from the API
 
         Raises:
-            APIError: If the request fails
+            APIError: If the request fails after retries
+            TransientError: If transient errors persist after retries
             AuthenticationError: If authentication fails
         """
         url = f"{self.base_url}{endpoint}"
         headers = self._get_auth_headers() if require_auth else {}
 
-        try:
-            response = self._session.get(url, headers=headers, params=params)
+        last_error = None
+        for attempt in range(RETRY_MAX_ATTEMPTS):
+            try:
+                response = self._session.get(
+                    url, headers=headers, params=params, timeout=REQUEST_TIMEOUT
+                )
 
-            # On 401, try refreshing the Kerberos ticket once
-            if response.status_code == 401 and require_auth:
-                logger.debug(f"Got 401 for {endpoint}, refreshing auth headers")
-                self._auth_headers = None  # Clear cached headers
-                headers = self._get_auth_headers()  # Get fresh headers
-                response = self._session.get(url, headers=headers, params=params)
-
-                if response.status_code == 401:
-                    raise AuthenticationError(
-                        f"Access denied for {endpoint}. Check if you have permission."
+                # On 401, try refreshing the Kerberos ticket once
+                if response.status_code == 401 and require_auth:
+                    logger.debug(f"Got 401 for {endpoint}, refreshing auth headers")
+                    self._auth_headers = None  # Clear cached headers
+                    headers = self._get_auth_headers()  # Get fresh headers
+                    response = self._session.get(
+                        url, headers=headers, params=params, timeout=REQUEST_TIMEOUT
                     )
 
-            if response.status_code == 403:
-                raise AuthenticationError(
-                    f"Access denied to {endpoint}. You may not have permission."
+                    if response.status_code == 401:
+                        raise AuthenticationError(
+                            f"Access denied for {endpoint}. Check if you have permission."
+                        )
+
+                if response.status_code == 403:
+                    raise AuthenticationError(
+                        f"Access denied to {endpoint}. You may not have permission."
+                    )
+
+                # Check for transient errors (5xx)
+                if response.status_code in TRANSIENT_STATUS_CODES:
+                    if attempt < RETRY_MAX_ATTEMPTS - 1:
+                        delay = RETRY_BASE_DELAY * (2**attempt)
+                        logger.debug(
+                            f"Got {response.status_code} for {endpoint}, "
+                            f"retrying in {delay}s (attempt {attempt + 1}/{RETRY_MAX_ATTEMPTS})"
+                        )
+                        time.sleep(delay)
+                        continue
+                    raise TransientError(
+                        f"Server error after {RETRY_MAX_ATTEMPTS} attempts: {response.status_code}",
+                        status_code=response.status_code,
+                        response=response.text[:500],
+                    )
+
+                if not response.ok:
+                    raise APIError(
+                        f"API request failed: {response.status_code}",
+                        status_code=response.status_code,
+                        response=response.text[:500],
+                    )
+
+                return response.json()
+
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                last_error = e
+                if attempt < RETRY_MAX_ATTEMPTS - 1:
+                    delay = RETRY_BASE_DELAY * (2**attempt)
+                    logger.debug(
+                        f"Network error for {endpoint}: {e}, "
+                        f"retrying in {delay}s (attempt {attempt + 1}/{RETRY_MAX_ATTEMPTS})"
+                    )
+                    time.sleep(delay)
+                    continue
+                raise TransientError(
+                    f"Network error after {RETRY_MAX_ATTEMPTS} attempts: {e}"
                 )
 
-            if not response.ok:
-                raise APIError(
-                    f"API request failed: {response.status_code}",
-                    status_code=response.status_code,
-                    response=response.text[:500],
-                )
-
-            return response.json()
-
-        except requests.exceptions.RequestException as e:
-            raise APIError(f"Network error: {e}")
+            except requests.exceptions.RequestException as e:
+                raise APIError(f"Network error: {e}")
 
     def get_public(
         self,

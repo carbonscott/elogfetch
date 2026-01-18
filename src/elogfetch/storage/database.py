@@ -641,6 +641,15 @@ class Database:
 
         logger.debug(f"Deleted all data for experiment: {experiment_id}")
 
+    def checkpoint(self) -> None:
+        """Force a WAL checkpoint to merge the -wal file into the main database."""
+        self.conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+
     def close(self) -> None:
         """Close the database connection."""
+        # Checkpoint WAL to merge -wal file into main database before closing
+        try:
+            self.conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        except Exception:
+            pass  # Ignore if not in WAL mode or already closed
         self.conn.close()
