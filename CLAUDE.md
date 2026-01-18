@@ -20,8 +20,12 @@ elogfetch fetch <experiment_id> # Fetch a specific experiment
 ## Testing
 
 ```bash
-pytest
+python -m pytest              # Run all tests
+python -m pytest -v           # Verbose output
+python -m pytest --cov=elogfetch --cov-report=term-missing  # With coverage
 ```
+
+**Note:** Always use `python -m pytest` instead of `pytest` to ensure tests run with the virtual environment's Python interpreter.
 
 ## Code Quality
 

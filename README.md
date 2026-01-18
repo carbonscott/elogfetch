@@ -139,8 +139,10 @@ The database is stored as `elog_YYYY_MMDD_HHMM.db` with the following tables:
 ```bash
 pip install -e ".[dev]"
 
-# Run tests
-pytest
+# Run tests (use python -m to ensure correct interpreter)
+python -m pytest
+python -m pytest -v                                        # Verbose
+python -m pytest --cov=elogfetch --cov-report=term-missing # Coverage
 
 # Format code
 black src/
