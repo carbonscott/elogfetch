@@ -63,11 +63,29 @@ elogfetch update --hours 24 --exclude 'txi*' --exclude 'test*'
 
 # Specify output directory
 elogfetch update --hours 168 --output-dir /path/to/data
+
+# Run with more parallel jobs for faster fetching
+elogfetch update --hours 24 --parallel 20
+
+# Incrementally update an existing database
+elogfetch update --hours 24 --incremental
+
+# Update a specific database file
+elogfetch update --hours 24 --incremental /path/to/existing.db
 ```
 
 ### Fetch a specific experiment
 ```bash
 elogfetch fetch mfxl1033223
+```
+
+### Retry failed experiments
+```bash
+# Retry experiments that failed in a previous run
+elogfetch retry
+
+# Retry from a specific failed_experiments.json file
+elogfetch retry --file /path/to/failed_experiments.json
 ```
 
 ### List recently updated experiments
@@ -95,6 +113,12 @@ Configuration precedence: CLI args > environment variables > config file > defau
 - `FETCH_ELOG_HOURS_LOOKBACK`: Hours to look back
 - `FETCH_ELOG_PARALLEL_JOBS`: Number of parallel jobs
 - `FETCH_ELOG_DATABASE_DIR`: Database directory
+
+### Advanced Options
+
+The `update` command supports tuning parameters for large datasets:
+- `--queue-size`: Buffer size for streaming (default: 100)
+- `--batch-size`: Experiments per database commit (default: 50)
 
 ## Database
 
