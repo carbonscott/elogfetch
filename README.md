@@ -148,3 +148,11 @@ python -m pytest --cov=elogfetch --cov-report=term-missing # Coverage
 black src/
 ruff check src/ --fix
 ```
+
+## Technical Notes
+
+### Database Journal Mode
+
+During operation, elogfetch uses SQLite WAL (Write-Ahead Logging) mode for better concurrent write performance. When the database is closed, it is automatically converted to DELETE journal mode for maximum portability.
+
+This ensures the resulting database file can be read by any SQLite client without requiring write permissions to create temporary `-wal` and `-shm` files.

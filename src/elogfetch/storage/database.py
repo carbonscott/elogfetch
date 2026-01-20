@@ -646,10 +646,17 @@ class Database:
         self.conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
     def close(self) -> None:
-        """Close the database connection."""
-        # Checkpoint WAL to merge -wal file into main database before closing
+        """Close the database connection.
+
+        Converts from WAL mode to DELETE mode for portability, ensuring
+        the database can be read by any SQLite client without requiring
+        write access to create -shm/-wal files.
+        """
         try:
+            # Checkpoint WAL to merge -wal file into main database
             self.conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            # Convert to DELETE mode for portability
+            self.conn.execute("PRAGMA journal_mode=DELETE")
         except Exception:
             pass  # Ignore if not in WAL mode or already closed
         self.conn.close()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -103,6 +104,23 @@ class TestWALMode:
         assert db_path.exists(), "Database file should exist"
         assert not wal_path.exists(), "WAL file should be removed after close"
         assert not shm_path.exists(), "SHM file should be removed after close"
+
+    def test_close_converts_to_delete_mode(self, tmp_path, sample_experiment_data):
+        """Verify database is converted to DELETE mode on close for portability."""
+        db_path = tmp_path / "test.db"
+
+        db = Database(db_path)
+        db.enable_wal_mode()
+        db.insert_experiment(sample_experiment_data)
+        db.close()
+
+        # Reopen and check journal mode
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.execute("PRAGMA journal_mode")
+        mode = cursor.fetchone()[0]
+        conn.close()
+
+        assert mode.lower() == "delete", f"Expected DELETE mode, got {mode}"
 
 
 class TestExperimentOperations:
