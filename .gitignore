@@ -25,6 +25,7 @@ ENV/
 *.db
 elog_*.db
 .elogfetch.lock
+.fetch_elog.lock
 
 # Deployment overrides
 env.local
