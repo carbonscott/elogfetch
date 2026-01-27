@@ -26,6 +26,10 @@ ENV/
 elog_*.db
 .elogfetch.lock
 
+# Deployment overrides
+env.local
+.uv-cache/
+
 # OS
 .DS_Store
 Thumbs.db
