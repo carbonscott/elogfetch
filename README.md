@@ -120,6 +120,50 @@ The `update` command supports tuning parameters for large datasets:
 - `--queue-size`: Buffer size for streaming (default: 100)
 - `--batch-size`: Experiments per database commit (default: 50)
 
+## Operations
+
+### Backfilling Missing Experiments
+
+If experiments are missing from the database (e.g., an instrument had no activity during the normal lookback window), you can run a one-time backfill with a longer lookback period.
+
+**Why experiments might be missing:**
+- The cron job uses a 7-day (168 hour) lookback window by default
+- Experiments only appear in the API response if they had elog activity within the lookback period
+- If an instrument was inactive for longer than the lookback window, its experiments won't be captured
+
+**Safe backfill procedure:**
+
+```bash
+# 1. Activate the environment
+source env.sh
+source .venv/bin/activate
+
+# 2. Verify Kerberos ticket
+klist -s || kinit
+
+# 3. (Optional) Dry-run to see what would be fetched
+elogfetch update --dry-run --hours 2160 \
+  --output-dir /path/to/data
+
+# 4. Run backfill with extended lookback (e.g., 90 days = 2160 hours)
+elogfetch update --incremental --hours 2160 --parallel 10 \
+  --output-dir /path/to/data
+
+# 5. Update the symlink to point to new database
+cd /path/to/data
+latest_db=$(ls -t elog_*.db | head -1)
+ln -sf "$latest_db" elog-copilot.db
+
+# 6. Verify the missing experiments were added
+sqlite3 elog-copilot.db "SELECT experiment_id, start_time FROM Experiment WHERE instrument='tmo' ORDER BY start_time DESC LIMIT 10;"
+```
+
+**Why this is safe:**
+- The `.elogfetch.lock` file prevents cron from running simultaneously
+- Creates a new timestamped database file (doesn't overwrite existing ones)
+- Uses `--incremental` to preserve existing data and only update changed experiments
+- The next cron run will use the backfilled database as its base
+
 ## Database
 
 The database is stored as `elog_YYYY_MMDD_HHMM.db` with the following tables:
