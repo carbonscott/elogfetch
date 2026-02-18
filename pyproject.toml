@@ -27,6 +27,7 @@ dependencies = [
     "pyyaml>=6.0",
     # krtc requires pykerberos which needs system Kerberos headers to compile.
     # Use UV_PYTHON to point to a conda environment that has krtc pre-installed.
+    "pydantic>=2.12.5"
 ]
 
 [project.optional-dependencies]
