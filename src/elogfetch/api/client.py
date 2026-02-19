@@ -4,13 +4,33 @@ from __future__ import annotations
 
 import subprocess
 import time
-from typing import Any
+from typing import Any, TypeVar
 
 import requests
 from krtc import KerberosTicket
+from pydantic import BaseModel
 
 from ..exceptions import APIError, AuthenticationError, TransientError
 from ..utils import get_logger
+from .gen.endpoint import Endpoint
+from .gen.endpoint_models import (
+    ELOG,
+    EXPERIMENT_INFO,
+    EXPERIMENT_NAMES_UPDATED_WITHIN,
+    FILES,
+    RUN,
+    RUNS,
+    WORKFLOW_DEFS,
+)
+from .gen.models import (
+    ElogResponse,
+    ExperimentNamesUpdatedWithinResponse,
+    FilesResponse,
+    InfoResponse,
+    RunsResponse,
+    SingleRunResponse,
+    WorkflowDefinitionsResponse,
+)
 
 logger = get_logger()
 
@@ -23,6 +43,8 @@ RETRY_MAX_ATTEMPTS = 3
 RETRY_BASE_DELAY = 2.0
 REQUEST_TIMEOUT = 30
 TRANSIENT_STATUS_CODES = {500, 502, 503, 504}
+
+M = TypeVar("M", bound=BaseModel)
 
 
 class ElogClient:
@@ -187,3 +209,50 @@ class ElogClient:
             JSON response from the API
         """
         return self.get(endpoint, params=params, require_auth=False)
+
+    def fetch(
+        self,
+        endpoint: Endpoint[M],
+        params: dict[str, Any] | None = None,
+        **path_params: Any,
+    ) -> M:
+        """Fetch and validate a typed API endpoint.
+
+        Args:
+            endpoint: Typed endpoint descriptor
+            params: Query parameters
+            **path_params: URL path parameters (e.g. experiment_name="mfxc00118")
+
+        Returns:
+            Validated Pydantic model instance
+        """
+        url = endpoint.url(**path_params)
+        data = (
+            self.get(url)
+            if endpoint.require_auth
+            else self.get_public(url, params=params)
+        )
+        return endpoint.model.model_validate(data)
+
+    def get_files(self, experiment_id: str) -> FilesResponse:
+        return self.fetch(FILES, experiment_name=experiment_id)
+
+    def get_experiments(self, offset_secs: int) -> ExperimentNamesUpdatedWithinResponse:
+        return self.fetch(
+            EXPERIMENT_NAMES_UPDATED_WITHIN, params={"offset_secs": offset_secs}
+        )
+
+    def get_experiment_info(self, experiment_id: str) -> InfoResponse:
+        return self.fetch(EXPERIMENT_INFO, experiment_name=experiment_id)
+
+    def get_elog(self, experiment_id: str) -> ElogResponse:
+        return self.fetch(ELOG, experiment_name=experiment_id)
+
+    def get_runs(self, experiment_id: str) -> RunsResponse:
+        return self.fetch(RUNS, experiment_name=experiment_id)
+
+    def get_run(self, experiment_id: str, run_num: int | str) -> SingleRunResponse:
+        return self.fetch(RUN, experiment_name=experiment_id, run_num=run_num)
+
+    def get_workflows(self, experiment_id: str) -> WorkflowDefinitionsResponse:
+        return self.fetch(WORKFLOW_DEFS, experiment_name=experiment_id)
