@@ -38,7 +38,9 @@ def acquire_lock(
             fcntl.flock(lock_file, flags)
         except BlockingIOError:
             lock_file.close()
-            raise LockError(f"Another instance is already running (lock: {lock_path})")
+            raise LockError(
+                f"Another instance is already running (lock: {lock_path})"
+            ) from None
 
         yield lock_file
 

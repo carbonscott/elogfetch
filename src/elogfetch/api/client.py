@@ -102,7 +102,7 @@ class ElogClient:
             ).getAuthHeaders()
             return self._auth_headers
         except Exception as e:
-            raise AuthenticationError(f"Failed to get Kerberos ticket: {e}")
+            raise AuthenticationError(f"Failed to get Kerberos ticket: {e}") from e
 
     def get(
         self,
@@ -128,7 +128,6 @@ class ElogClient:
         url = f"{self.base_url}{endpoint}"
         headers = self._get_auth_headers() if require_auth else {}
 
-        last_error = None
         for attempt in range(RETRY_MAX_ATTEMPTS):
             try:
                 response = self._session.get(
@@ -183,7 +182,6 @@ class ElogClient:
                 requests.exceptions.Timeout,
                 requests.exceptions.ConnectionError,
             ) as e:
-                last_error = e
                 if attempt < RETRY_MAX_ATTEMPTS - 1:
                     delay = RETRY_BASE_DELAY * (2**attempt)
                     logger.debug(
@@ -194,10 +192,10 @@ class ElogClient:
                     continue
                 raise TransientError(
                     f"Network error after {RETRY_MAX_ATTEMPTS} attempts: {e}"
-                )
+                ) from e
 
             except requests.exceptions.RequestException as e:
-                raise APIError(f"Network error: {e}")
+                raise APIError(f"Network error: {e}") from e
 
     def get_public(
         self,

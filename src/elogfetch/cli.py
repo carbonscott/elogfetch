@@ -436,7 +436,6 @@ def fetch(ctx, experiment_id, output_dir):
 @click.pass_context
 def status(ctx, database_dir):
     """Show status of local database."""
-    logger = ctx.obj["logger"]
     config = ctx.obj["config"]
 
     db_dir = Path(database_dir) if database_dir else config.database_dir or Path.cwd()
