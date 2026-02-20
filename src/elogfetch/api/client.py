@@ -261,3 +261,6 @@ class ElogClient:
 
     def get_workflows(self, experiment_id: str) -> WorkflowDefinitionsResponse:
         return self.fetch(WORKFLOW_DEFS, experiment_name=experiment_id)
+
+    # def get_questionnaire(self, experiment_id: str) -> QuestionnaireResponse:
+    #     return fetch_questionnaire(self, experiment_id)
