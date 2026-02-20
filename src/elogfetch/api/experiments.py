@@ -30,7 +30,7 @@ def fetch_updated_experiments(
 
     logger.info(f"Fetching experiments updated in last {offset_secs} seconds...")
 
-    data = client.get_public(endpoint, params=params)
+    data = client.get(endpoint, params=params, require_auth=False)
 
     # Extract experiment names from the response
     if isinstance(data, dict) and "value" in data:
