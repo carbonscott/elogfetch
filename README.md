@@ -9,13 +9,15 @@ This package requires `krtc` which is only available in SLAC conda environments.
 ### Setup
 
 1. Create a `.env` file from the template:
+
 ```bash
 cp .env.example .env
 ```
 
-2. Edit `.env` to set paths for your environment (`UV_CACHE_DIR` and `UV_PYTHON`)
+1. Edit `.env` to set paths for your environment (`UV_CACHE_DIR` and `UV_PYTHON`)
 
-3. Create a virtual environment and install:
+2. Create a virtual environment and install:
+
 ```bash
 set -a; source .env; set +a
 uv venv --python $UV_PYTHON --system-site-packages
@@ -23,12 +25,14 @@ unset UV_PYTHON  # so uv pip targets .venv, not the conda env
 uv pip install -e .
 ```
 
-4. Activate the environment:
+1. Activate the environment:
+
 ```bash
 source .venv/bin/activate
 ```
 
 ### Available conda environments with krtc
+
 ```bash
 ls /sdf/group/lcls/ds/ana/sw/conda1/inst/envs/
 ```
@@ -39,6 +43,7 @@ ls /sdf/group/lcls/ds/ana/sw/conda1/inst/envs/
 - Python 3.9+ (from a SLAC conda environment with `krtc`)
 
 Before using, authenticate with Kerberos:
+
 ```bash
 kinit
 ```
@@ -46,11 +51,13 @@ kinit
 ## Usage
 
 ### Check status
+
 ```bash
 elogfetch status
 ```
 
 ### Update database with recent experiments
+
 ```bash
 # Fetch experiments updated in the last 24 hours
 elogfetch update --hours 24
@@ -75,11 +82,13 @@ elogfetch update --hours 24 --incremental /path/to/existing.db
 ```
 
 ### Fetch a specific experiment
+
 ```bash
 elogfetch fetch mfxl1033223
 ```
 
 ### Retry failed experiments
+
 ```bash
 # Retry experiments that failed in a previous run
 elogfetch retry
@@ -89,6 +98,7 @@ elogfetch retry --file /path/to/failed_experiments.json
 ```
 
 ### List recently updated experiments
+
 ```bash
 elogfetch list-experiments --hours 72
 ```
@@ -117,6 +127,7 @@ Configuration precedence: CLI args > environment variables > config file > defau
 ### Advanced Options
 
 The `update` command supports tuning parameters for large datasets:
+
 - `--queue-size`: Buffer size for streaming (default: 100)
 - `--batch-size`: Experiments per database commit (default: 50)
 
@@ -127,6 +138,7 @@ The `update` command supports tuning parameters for large datasets:
 If experiments are missing from the database (e.g., an instrument had no activity during the normal lookback window), you can run a one-time backfill with a longer lookback period.
 
 **Why experiments might be missing:**
+
 - The cron job uses a 7-day (168 hour) lookback window by default
 - Experiments only appear in the API response if they had elog activity within the lookback period
 - If an instrument was inactive for longer than the lookback window, its experiments won't be captured
@@ -159,6 +171,7 @@ sqlite3 elog-copilot.db "SELECT experiment_id, start_time FROM Experiment WHERE 
 ```
 
 **Why this is safe:**
+
 - The `.elogfetch.lock` file prevents cron from running simultaneously
 - Creates a new timestamped database file (doesn't overwrite existing ones)
 - Uses `--incremental` to preserve existing data and only update changed experiments
