@@ -7,21 +7,21 @@ import logging
 import queue
 import shutil
 import sys
-from pathlib import Path
-from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from threading import Thread, Event, Lock
+from datetime import datetime
+from pathlib import Path
+from threading import Event, Lock, Thread
 
 import click
 
 from .api import (
     ElogClient,
-    fetch_updated_experiments,
     fetch_experiment_info,
     fetch_file_manager,
     fetch_logbook,
-    fetch_runtable,
     fetch_questionnaire,
+    fetch_runtable,
+    fetch_updated_experiments,
     fetch_workflow,
 )
 from .config import Config
@@ -387,7 +387,7 @@ def fetch(ctx, experiment_id, output_dir):
         info = fetch_experiment_info(client, experiment_id)
         if info:
             db.insert_experiment(info)
-            logger.info(f"Fetched experiment info")
+            logger.info("Fetched experiment info")
 
         logbook = fetch_logbook(client, experiment_id)
         if logbook:
@@ -397,7 +397,7 @@ def fetch(ctx, experiment_id, output_dir):
         runtable = fetch_runtable(client, experiment_id)
         if runtable:
             db.insert_runtable(runtable)
-            logger.info(f"Fetched runtable data")
+            logger.info("Fetched runtable data")
 
         file_manager = fetch_file_manager(client, experiment_id)
         if file_manager:
@@ -445,7 +445,7 @@ def status(ctx, database_dir):
 
     if not db_path:
         click.echo("No database found.")
-        click.echo(f"Run 'elogfetch update' to create one.")
+        click.echo("Run 'elogfetch update' to create one.")
         return
 
     click.echo(f"Database: {db_path}")

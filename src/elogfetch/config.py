@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
+import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-import os
-import re
 
 import yaml
-
 
 DB_PREFIX = "elog_"
 DB_PATTERN = re.compile(r"^elog_(\d{4})_(\d{4})_(\d{4})\.db$")
@@ -41,7 +40,7 @@ class Config:
         cls,
         config_file: Path | None = None,
         cli_args: dict[str, Any] | None = None,
-    ) -> "Config":
+    ) -> Config:
         """Load config with precedence: CLI > env > file > defaults."""
         config = cls()
 
@@ -59,7 +58,7 @@ class Config:
         return config
 
     @classmethod
-    def _merge_yaml(cls, config: "Config", config_file: Path) -> "Config":
+    def _merge_yaml(cls, config: Config, config_file: Path) -> Config:
         """Merge configuration from YAML file."""
         with open(config_file) as f:
             data = yaml.safe_load(f)
@@ -85,7 +84,7 @@ class Config:
         return config
 
     @classmethod
-    def _merge_env(cls, config: "Config") -> "Config":
+    def _merge_env(cls, config: Config) -> Config:
         """Merge configuration from environment variables."""
         if val := os.environ.get("FETCH_ELOG_HOURS_LOOKBACK"):
             config.hours_lookback = float(val)
@@ -103,7 +102,7 @@ class Config:
         return config
 
     @classmethod
-    def _merge_cli(cls, config: "Config", cli_args: dict[str, Any]) -> "Config":
+    def _merge_cli(cls, config: Config, cli_args: dict[str, Any]) -> Config:
         """Merge configuration from CLI arguments."""
         if cli_args.get("hours") is not None:
             config.hours_lookback = float(cli_args["hours"])
