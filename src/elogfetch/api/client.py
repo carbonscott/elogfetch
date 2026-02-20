@@ -97,7 +97,9 @@ class ElogClient:
             )
 
         try:
-            self._auth_headers = KerberosTicket(self.kerberos_principal).getAuthHeaders()
+            self._auth_headers = KerberosTicket(
+                self.kerberos_principal
+            ).getAuthHeaders()
             return self._auth_headers
         except Exception as e:
             raise AuthenticationError(f"Failed to get Kerberos ticket: {e}")
@@ -177,7 +179,10 @@ class ElogClient:
 
                 return response.json()
 
-            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            except (
+                requests.exceptions.Timeout,
+                requests.exceptions.ConnectionError,
+            ) as e:
                 last_error = e
                 if attempt < RETRY_MAX_ATTEMPTS - 1:
                     delay = RETRY_BASE_DELAY * (2**attempt)
