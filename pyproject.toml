@@ -7,7 +7,7 @@ name = "elogfetch"
 version = "0.1.0"
 description = "Fetch LCLS experiment data from the electronic logbook"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -15,7 +15,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -28,7 +27,10 @@ dependencies = [
     # krtc requires pykerberos which needs system Kerberos headers to compile.
     # Use UV_PYTHON to point to a conda environment that has krtc pre-installed.
     "pydantic>=2.12.5"
+    "sqlmodel>=0.0.37",
     "stamina>=25.1.0",
+    "psycopg[binary]<4.0.0,>=3.1.13",
+    "alembic>=1.18.4",
 ]
 
 [dependency-groups]
@@ -36,6 +38,7 @@ dev = [
     "pytest>=8.4.2",
     "pytest-cov>=7.0.0",
     "ruff>=0.15.1",
+    "testcontainers>=4.13.0",
 ]
 
 
