@@ -30,6 +30,6 @@ python -m pytest --cov=elogfetch --cov-report=term-missing  # With coverage
 ## Code Quality
 
 ```bash
-black src/
-ruff check src/ --fix
+uv run ruff format
+uv run ruff check . --fix
 ```

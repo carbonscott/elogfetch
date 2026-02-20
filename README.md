@@ -189,8 +189,8 @@ python -m pytest -v                                        # Verbose
 python -m pytest --cov=elogfetch --cov-report=term-missing # Coverage
 
 # Format code
-black src/
-ruff check src/ --fix
+uv run ruff format src/
+uv run ruff check src/ --fix
 ```
 
 ## Technical Notes
