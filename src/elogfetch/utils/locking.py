@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import fcntl
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator, IO
+from typing import IO
 
 from ..exceptions import LockError
 

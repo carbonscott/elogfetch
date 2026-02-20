@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from elogfetch.api.experiments import _filter_experiments
 
 
