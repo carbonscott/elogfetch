@@ -71,6 +71,7 @@ class ElogClient:
         self.kerberos_principal = kerberos_principal or DEFAULT_KERBEROS_PRINCIPAL
         self._auth_headers: dict[str, str] | None = None
         self._session = httpx.AsyncClient(timeout=REQUEST_TIMEOUT)
+        self._sync_session = httpx.Client(timeout=REQUEST_TIMEOUT)
 
     async def __aenter__(self) -> ElogClient:
         return self
@@ -163,22 +164,6 @@ class ElogClient:
         response.raise_for_status()
         return response.json()
 
-    async def get_public(
-        self,
-        endpoint: str,
-        params: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Make an unauthenticated GET request.
-
-        Args:
-            endpoint: API endpoint (relative to base URL)
-            params: Query parameters
-
-        Returns:
-            JSON response from the API
-        """
-        return await self.get(endpoint, params=params, require_auth=False)
-
     async def fetch(
         self,
         endpoint: Endpoint[M],
@@ -196,11 +181,7 @@ class ElogClient:
             Validated Pydantic model instance
         """
         url = endpoint.url(**path_params)
-        data = (
-            await self.get(url, params=params)
-            if endpoint.require_auth
-            else await self.get_public(url, params=params)
-        )
+        data = await self.get(url, params=params, require_auth=endpoint.require_auth)
         return endpoint.model.model_validate(data)
 
     async def get_files(self, experiment_id: str) -> FilesResponse:
