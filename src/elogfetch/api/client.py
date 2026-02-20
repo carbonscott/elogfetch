@@ -7,10 +7,11 @@ import subprocess
 from typing import Any, TypeVar
 
 import httpx
+import stamina
 from krtc import KerberosTicket
 from pydantic import BaseModel
 
-from ..exceptions import APIError, AuthenticationError, TransientError
+from ..exceptions import AuthenticationError
 from ..utils import get_logger
 from .gen.endpoint import Endpoint
 from .gen.endpoint_models import (
@@ -39,12 +40,17 @@ DEFAULT_BASE_URL = "https://pswww.slac.stanford.edu"
 DEFAULT_KERBEROS_PRINCIPAL = "HTTP@pswww.slac.stanford.edu"
 
 # Retry configuration
-RETRY_MAX_ATTEMPTS = 3
-RETRY_BASE_DELAY = 2.0
 REQUEST_TIMEOUT = 30
-TRANSIENT_STATUS_CODES = {500, 502, 503, 504}
 
 M = TypeVar("M", bound=BaseModel)
+
+
+def _is_retryable(exc: Exception) -> bool:
+    if isinstance(exc, (httpx.TimeoutException, httpx.ConnectError)):
+        return True
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code >= 500
+    return False
 
 
 class ElogClient:
@@ -111,13 +117,16 @@ class ElogClient:
         except Exception as e:
             raise AuthenticationError(f"Failed to get Kerberos ticket: {e}") from e
 
+    @stamina.retry(on=_is_retryable)
     async def get(
         self,
         endpoint: str,
         params: dict[str, Any] | None = None,
         require_auth: bool = True,
     ) -> dict[str, Any]:
-        """Make a GET request to the API with retry logic.
+        """Make a GET request to the API.
+
+        Transient errors (5xx, network) are retried automatically via stamina.
 
         Args:
             endpoint: API endpoint (relative to base URL)
@@ -128,79 +137,31 @@ class ElogClient:
             JSON response from the API
 
         Raises:
-            APIError: If the request fails after retries
-            TransientError: If transient errors persist after retries
+            APIError: If the request fails with a non-retryable error
             AuthenticationError: If authentication fails
         """
         url = f"{self.base_url}{endpoint}"
         headers = await self._get_auth_headers() if require_auth else {}
+        response = await self._session.get(url, headers=headers, params=params)
 
-        for attempt in range(RETRY_MAX_ATTEMPTS):
-            try:
-                response = await self._session.get(url, headers=headers, params=params)
+        # On 401, refresh the Kerberos ticket and retry once
+        if response.status_code == 401 and require_auth:
+            logger.debug(f"Got 401 for {endpoint}, refreshing auth headers")
+            self._auth_headers = None
+            headers = await self._get_auth_headers()
+            response = await self._session.get(url, headers=headers, params=params)
+            if response.status_code == 401:
+                raise AuthenticationError(
+                    f"Access denied for {endpoint}. Check if you have permission."
+                )
 
-                # On 401, try refreshing the Kerberos ticket once
-                if response.status_code == 401 and require_auth:
-                    logger.debug(f"Got 401 for {endpoint}, refreshing auth headers")
-                    self._auth_headers = None
-                    headers = await self._get_auth_headers()
-                    response = await self._session.get(
-                        url, headers=headers, params=params
-                    )
+        if response.status_code == 403:
+            raise AuthenticationError(
+                f"Access denied to {endpoint}. You may not have permission."
+            )
 
-                    if response.status_code == 401:
-                        raise AuthenticationError(
-                            f"Access denied for {endpoint}. Check if you have permission."
-                        )
-
-                if response.status_code == 403:
-                    raise AuthenticationError(
-                        f"Access denied to {endpoint}. You may not have permission."
-                    )
-
-                # Check for transient errors (5xx)
-                if response.status_code in TRANSIENT_STATUS_CODES:
-                    if attempt < RETRY_MAX_ATTEMPTS - 1:
-                        delay = RETRY_BASE_DELAY * (2**attempt)
-                        logger.debug(
-                            f"Got {response.status_code} for {endpoint}, "
-                            f"retrying in {delay}s (attempt {attempt + 1}/{RETRY_MAX_ATTEMPTS})"
-                        )
-                        await asyncio.sleep(delay)
-                        continue
-                    raise TransientError(
-                        f"Server error after {RETRY_MAX_ATTEMPTS} attempts: {response.status_code}",
-                        status_code=response.status_code,
-                        response=response.text[:500],
-                    )
-
-                if not response.is_success:
-                    raise APIError(
-                        f"API request failed: {response.status_code}",
-                        status_code=response.status_code,
-                        response=response.text[:500],
-                    )
-
-                return response.json()
-
-            except (httpx.TimeoutException, httpx.ConnectError) as e:
-                if attempt < RETRY_MAX_ATTEMPTS - 1:
-                    delay = RETRY_BASE_DELAY * (2**attempt)
-                    logger.debug(
-                        f"Network error for {endpoint}: {e}, "
-                        f"retrying in {delay}s (attempt {attempt + 1}/{RETRY_MAX_ATTEMPTS})"
-                    )
-                    await asyncio.sleep(delay)
-                    continue
-                raise TransientError(
-                    f"Network error after {RETRY_MAX_ATTEMPTS} attempts: {e}"
-                ) from e
-
-            except httpx.RequestError as e:
-                raise APIError(f"Network error: {e}") from e
-
-        # unreachable, but satisfies type checker
-        raise APIError(f"Failed to GET {endpoint} after {RETRY_MAX_ATTEMPTS} attempts")
+        response.raise_for_status()
+        return response.json()
 
     async def get_public(
         self,
