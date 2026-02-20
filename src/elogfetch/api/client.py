@@ -233,7 +233,7 @@ class ElogClient:
         """
         url = endpoint.url(**path_params)
         data = (
-            self.get(url)
+            self.get(url, params=params)
             if endpoint.require_auth
             else self.get_public(url, params=params)
         )
