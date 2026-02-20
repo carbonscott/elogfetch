@@ -85,7 +85,9 @@ def _filter_experiments(
             filtered.append(exp)
 
     if excluded_count > 0:
-        logger.info(f"Excluded {excluded_count} experiments by patterns {exclude_patterns}")
+        logger.info(
+            f"Excluded {excluded_count} experiments by patterns {exclude_patterns}"
+        )
 
     logger.info(f"Returning {len(filtered)} experiments after filtering")
     return filtered
