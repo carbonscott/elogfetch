@@ -20,7 +20,7 @@ import json
 import sys
 import tarfile
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 
 import requests
 from krtc import KerberosTicket
@@ -47,7 +47,7 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 # Helpers
 # ---------------------------------------------------------------------------
 
-_errors: List[str] = []
+_errors: list[str] = []
 
 
 def _safe_filename(s: str) -> str:
@@ -70,7 +70,7 @@ def save_json(name: str, data) -> None:
 
 def get_binary(
     url_path: str,
-    params: Optional[Dict] = None,
+    params: Optional[dict] = None,
     *,
     name: Optional[str] = None,
     ext: str = "bin",
@@ -121,7 +121,7 @@ def get_binary(
 
 def get_text(
     url_path: str,
-    params: Optional[Dict] = None,
+    params: Optional[dict] = None,
     *,
     name: Optional[str] = None,
     ext: str = "txt",
@@ -163,7 +163,7 @@ def get_text(
     return r.text
 
 
-def get(url_path: str, params: Optional[Dict] = None, *, name: Optional[str] = None):
+def get(url_path: str, params: Optional[dict] = None, *, name: Optional[str] = None):
     """
     GET BASE_URL + url_path, save the response JSON, and return the parsed data.
 
@@ -232,7 +232,7 @@ get("/lgbk/ws/experiments", name="global__experiments")
 get("/lgbk/ws/instruments", name="global__instruments")
 get("/lgbk/ws/instrument_station_list", name="global__instrument_station_list")
 _active_resp = get("/lgbk/ws/activeexperiments", name="global__activeexperiments")
-_active_exps: List[Dict] = (
+_active_exps: list[dict] = (
     _active_resp.get("value", []) if isinstance(_active_resp, dict) else []
 )
 get("/lgbk/ws/experiment_stats", name="global__experiment_stats")
@@ -285,7 +285,7 @@ get(
 
 # Grab instrument list to use for instrument-specific calls later
 _instruments_resp = get("/lgbk/ws/instruments", name="global__instruments")
-_instruments: List[Dict] = (
+_instruments: list[dict] = (
     _instruments_resp.get("value", []) if isinstance(_instruments_resp, dict) else []
 )
 _first_instrument = _instruments[0]["_id"] if _instruments else "RIX"
@@ -381,7 +381,7 @@ get(
 print("\n=== Phase 3: Run-specific endpoints ===\n")
 
 runs_resp = get(f"{EXP}/ws/runs", name="exp__runs")
-_runs: List[Dict] = runs_resp.get("value", []) if isinstance(runs_resp, dict) else []
+_runs: list[dict] = runs_resp.get("value", []) if isinstance(runs_resp, dict) else []
 
 if _runs:
     # Use the latest closed run for per-run calls
@@ -413,7 +413,7 @@ if _runs:
     # files_for_live_mode_at_location – needs a valid location name
     # also fetch <run_num>/files_for_live_mode_at_location (done below with location name)
     dm_resp = get(f"{EXP}/ws/dm_locations", name="exp__dm_locations")
-    _locations: List[Dict] = (
+    _locations: list[dict] = (
         dm_resp.get("value", []) if isinstance(dm_resp, dict) else []
     )
     if _locations:
@@ -438,7 +438,7 @@ else:
 print("\n=== Phase 3b: Attachment download ===\n")
 
 _elog_for_attach = get(f"{EXP}/ws/elog", name="exp__elog")
-_elogs_for_attach: List[Dict] = (
+_elogs_for_attach: list[dict] = (
     _elog_for_attach.get("value", []) if isinstance(_elog_for_attach, dict) else []
 )
 _found_attachment = False
@@ -465,7 +465,7 @@ if not _found_attachment:
 print("\n=== Phase 3c: Workflow job details ===\n")
 
 _wf_jobs_resp = get(f"{EXP}/ws/workflow_jobs", name="exp__workflow_jobs")
-_wf_jobs: List[Dict] = (
+_wf_jobs: list[dict] = (
     _wf_jobs_resp.get("value", []) if isinstance(_wf_jobs_resp, dict) else []
 )
 if _wf_jobs:
@@ -486,7 +486,7 @@ else:
 print("\n=== Phase 4: Run table data ===\n")
 
 rt_resp = get(f"{EXP}/ws/run_tables", name="exp__run_tables")
-_tables: List[Dict] = rt_resp.get("value", []) if isinstance(rt_resp, dict) else []
+_tables: list[dict] = rt_resp.get("value", []) if isinstance(rt_resp, dict) else []
 for table in _tables[:3]:  # limit to first 3 tables to avoid very large dumps
     tname = table.get("name")
     if tname:
@@ -509,7 +509,7 @@ for table in _tables[:3]:  # limit to first 3 tables to avoid very large dumps
 print("\n=== Phase 5: Sample details ===\n")
 
 samples_resp = get(f"{EXP}/ws/samples", name="exp__samples")
-_samples: List[Dict] = (
+_samples: list[dict] = (
     samples_resp.get("value", []) if isinstance(samples_resp, dict) else []
 )
 for s in _samples[:3]:
@@ -527,7 +527,7 @@ for s in _samples[:3]:
 print("\n=== Phase 6: Elog entry tree ===\n")
 
 elog_resp = get(f"{EXP}/ws/elog", name="exp__elog")
-_elogs: List[Dict] = elog_resp.get("value", []) if isinstance(elog_resp, dict) else []
+_elogs: list[dict] = elog_resp.get("value", []) if isinstance(elog_resp, dict) else []
 if _elogs:
     entry_id = str(_elogs[0].get("_id", ""))
     if entry_id:
@@ -543,7 +543,7 @@ if _elogs:
 print("\n=== Phase 7: Project details ===\n")
 
 _projects_resp = get("/lgbk/ws/projects", name="global__projects")
-_projects: List[Dict] = (
+_projects: list[dict] = (
     _projects_resp.get("value", []) if isinstance(_projects_resp, dict) else []
 )
 for _prj in _projects[:3]:  # limit to first 3 projects
@@ -559,7 +559,7 @@ for _prj in _projects[:3]:  # limit to first 3 projects
         f"/lgbk/ws/projects/{_prj_id}/sessions",
         name=f"project__{_prj_id}__sessions",
     )
-    _grids: List[Dict] = (
+    _grids: list[dict] = (
         _grids_resp.get("value", []) if isinstance(_grids_resp, dict) else []
     )
     for _grid in _grids[:2]:  # limit to first 2 grids per project
