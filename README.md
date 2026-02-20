@@ -194,12 +194,12 @@ The database is stored as `elog_YYYY_MMDD_HHMM.db` with the following tables:
 ## Development
 
 ```bash
-pip install -e ".[dev]"
+uv sync
 
 # Run tests (use python -m to ensure correct interpreter)
-python -m pytest
-python -m pytest -v                                        # Verbose
-python -m pytest --cov=elogfetch --cov-report=term-missing # Coverage
+uv run pytest
+uv run pytest -v # Verbose
+uv run pytest --cov=elogfetch --cov-report=term-missing # Coverage
 
 # Format code
 uv run ruff format src/
