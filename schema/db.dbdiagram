@@ -1,0 +1,423 @@
+{
+  "version": "1.0.0",
+  "darkMode": true,
+  "gridEnabling": false,
+  "detailLevel": "All",
+  "tablePositions": [
+    {
+      "name": "user",
+      "schemaName": "public",
+      "x": 376,
+      "y": 984
+    },
+    {
+      "name": "posix_group",
+      "schemaName": "public",
+      "x": 1144,
+      "y": 1112
+    },
+    {
+      "name": "detector",
+      "schemaName": "public",
+      "x": 600,
+      "y": 1288
+    },
+    {
+      "name": "metadata",
+      "schemaName": "public",
+      "x": 1312,
+      "y": 48
+    },
+    {
+      "name": "pi",
+      "schemaName": "public",
+      "x": 464,
+      "y": 792
+    },
+    {
+      "name": "user_posix_group",
+      "schemaName": "public",
+      "x": 872,
+      "y": 1280
+    },
+    {
+      "name": "experiment",
+      "schemaName": "public",
+      "x": 672,
+      "y": 888
+    },
+    {
+      "name": "experiment_slack_channel",
+      "schemaName": "public",
+      "x": 48,
+      "y": 1088
+    },
+    {
+      "name": "experiment_analysis_queue",
+      "schemaName": "public",
+      "x": 56,
+      "y": 1368
+    },
+    {
+      "name": "questionnaire",
+      "schemaName": "public",
+      "x": 304,
+      "y": 1536
+    },
+    {
+      "name": "workflowdefinition",
+      "schemaName": "public",
+      "x": 824,
+      "y": 48
+    },
+    {
+      "name": "run",
+      "schemaName": "public",
+      "x": 328,
+      "y": 1152
+    },
+    {
+      "name": "run_production_data",
+      "schemaName": "public",
+      "x": 664,
+      "y": 472
+    },
+    {
+      "name": "run_detector",
+      "schemaName": "public",
+      "x": 152,
+      "y": 792
+    },
+    {
+      "name": "logbook",
+      "schemaName": "public",
+      "x": 720,
+      "y": 1520
+    },
+    {
+      "name": "workflow",
+      "schemaName": "public",
+      "x": 192,
+      "y": 280
+    }
+  ],
+  "tableGroupCollapseStates": [],
+  "stickyNoteLayouts": [],
+  "referencePaths": [
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "pi",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id"
+      ],
+      "secondTableName": "user",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "user_id"
+      ],
+      "firstTableName": "user_posix_group",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id"
+      ],
+      "secondTableName": "user",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "posix_group_name"
+      ],
+      "firstTableName": "user_posix_group",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "name"
+      ],
+      "secondTableName": "posix_group",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "pi_id"
+      ],
+      "firstTableName": "experiment",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id"
+      ],
+      "secondTableName": "pi",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "posix_group"
+      ],
+      "firstTableName": "experiment",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "name"
+      ],
+      "secondTableName": "posix_group",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "experiment_id"
+      ],
+      "firstTableName": "experiment_slack_channel",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "experiment_id"
+      ],
+      "secondTableName": "experiment",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "experiment_id"
+      ],
+      "firstTableName": "experiment_analysis_queue",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "experiment_id"
+      ],
+      "secondTableName": "experiment",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "experiment_id"
+      ],
+      "firstTableName": "questionnaire",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "experiment_id"
+      ],
+      "secondTableName": "experiment",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "experiment_id"
+      ],
+      "firstTableName": "workflowdefinition",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "experiment_id"
+      ],
+      "secondTableName": "experiment",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "experiment_id"
+      ],
+      "firstTableName": "run",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "experiment_id"
+      ],
+      "secondTableName": "experiment",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "experiment_id"
+      ],
+      "firstTableName": "logbook",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "experiment_id"
+      ],
+      "secondTableName": "experiment",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "experiment_id"
+      ],
+      "firstTableName": "workflow",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "experiment_id"
+      ],
+      "secondTableName": "experiment",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "run_id"
+      ],
+      "firstTableName": "run_production_data",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "id"
+      ],
+      "secondTableName": "run",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "experiment_id"
+      ],
+      "firstTableName": "run_production_data",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "experiment_id"
+      ],
+      "secondTableName": "experiment",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "run_id"
+      ],
+      "firstTableName": "run_detector",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id"
+      ],
+      "secondTableName": "run",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "detector_id"
+      ],
+      "firstTableName": "run_detector",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id"
+      ],
+      "secondTableName": "detector",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "experiment_id"
+      ],
+      "firstTableName": "run_detector",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "experiment_id"
+      ],
+      "secondTableName": "experiment",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "run_id"
+      ],
+      "firstTableName": "logbook",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id"
+      ],
+      "secondTableName": "run",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "run_id"
+      ],
+      "firstTableName": "workflow",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id"
+      ],
+      "secondTableName": "run",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "def_id"
+      ],
+      "firstTableName": "workflow",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id"
+      ],
+      "secondTableName": "workflowdefinition",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "user_id"
+      ],
+      "firstTableName": "workflow",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id"
+      ],
+      "secondTableName": "user",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    }
+  ]
+}
