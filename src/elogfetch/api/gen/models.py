@@ -17,9 +17,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
 from typing import Any, Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 T = TypeVar("T")
 
@@ -115,6 +116,8 @@ class ElogEntry(BaseModel):
     title: str | None = None
     # Populated by complete_elog_tree endpoint
     children: list[ElogEntry] | None = None
+    root: str | None = None  # id of root entry
+    parent: str | None = None  # id of parent entry
 
 
 ElogEntry.model_rebuild()  # rebuild for forward ref (children)
@@ -155,6 +158,43 @@ class FileEntry(BaseModel):
 
 # --------------- Runs --------------------------------------------------------
 
+DETECTOR_PREFIX = "DAQ Detectors/"
+
+
+class RunDetector(BaseModel):
+    id: str
+    value: str
+
+
+class RunParams(BaseModel):
+    """Run parameters, returned by
+
+    Returned by ``/ws/runs/<num>?includeParams=true``, etc.
+    """
+
+    model_config = _cfg
+
+    n_events: int | None = Field(default=None, alias="DAQ Detector Totals/Events")
+    n_damaged: int | None = Field(default=None, alias="DAQ Detector Totals/Damaged")
+    n_dropped: int | None = Field(default=None, alias="N dropped Shots")
+    prod_start: datetime | None = Field(default=None, alias="Prod_start")
+    prod_end: datetime | None = Field(default=None, alias="Prod_end")
+    prod_jobstart: datetime | None = Field(default=None, alias="Prod_jobstart")
+    detectors: list[RunDetector] | None = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def apply_detectors(cls, data: Any):
+        if not isinstance(data, dict):
+            return data
+        det_ids = [k for k in data.keys() if k.startswith(DETECTOR_PREFIX)]
+
+        # TODO: I think this is fine to mutate the incoming data as long as "detectors"
+        # is not a part of the incoming data (which it is not, to my knowledge)
+        dets = [{"id": det_id, "value": data[det_id]} for det_id in det_ids]
+        data["detectors"] = dets
+        return data
+
 
 class Run(BaseModel):
     """A single DAQ run.
@@ -166,11 +206,11 @@ class Run(BaseModel):
 
     id: str = Field(alias="_id")
     num: int
-    type: str
+    type: str  # TODO: should be an enum, but really only looks to be of type "DATA"
     begin_time: datetime
-    end_time: datetime | None = None
+    end_time: datetime
     # Arbitrary EPICS / DAQ / user parameters recorded at run start
-    params: dict[str, Any] = Field(default_factory=dict)
+    params: RunParams = Field(default_factory=RunParams)
     sample: str | None = None
 
 
@@ -183,7 +223,9 @@ class RunTableRow(BaseModel):
     num: int
     begin_time: datetime
     end_time: datetime | None = None
-    params: dict[str, Any] = Field(default_factory=dict)
+    params: dict[str, Any] = Field(
+        default_factory=dict
+    )  # TODO: this could be RunParams too, probably but double check
     # millisecond epoch equivalents, added by the API for front-end use
     begin_time_epoch: int | None = None
     end_time_epoch: int | None = None
@@ -196,7 +238,9 @@ class RunParamSummary(BaseModel):
 
     id: str = Field(alias="_id")
     num: int
-    params: dict[str, Any] = Field(default_factory=dict)
+    params: dict[str, Any] = Field(
+        default_factory=dict
+    )  # TODO: this could be RunParams too, probably but double check
 
 
 class RunForCalib(BaseModel):
@@ -336,6 +380,9 @@ class ExperimentParams(BaseModel):
     zoom_meeting_id: str | None = None
     zoom_meeting_pwd: str | None = None
     zoom_meeting_url: str | None = None
+    slack_channels: str | None = None
+    analysis_queues: str | None = None
+    data_path: Path | None = Field(alias="DATA_PATH")
 
 
 class Experiment(BaseModel):
@@ -348,21 +395,23 @@ class Experiment(BaseModel):
 
     id: str = Field(alias="_id")
     name: str
+    instrument: str  # TODO: should be an enum
+    posix_group: str
+    leader_account: str
+    start_time: datetime
+    end_time: datetime
+    contact_info: str
     type: str | None = None
-    instrument: str
-    posix_group: str | None = None
-    leader_account: str | None = None
+    description: str
     data_collection_software: str | None = None
-    description: str | None = None
-    contact_info: str | None = None
-    start_time: datetime | None = None
-    end_time: datetime | None = None
+    registration_time: datetime | None = None
     params: dict[str, Any] = Field(default_factory=dict)
     # Fields present in the global experiments list
     players: list[str] | None = None
     post_players: list[str] | None = None
     run_count: int | None = None
-    registration_time: datetime | None = None
+    total_files: int | None = Field(alias="totalFiles")
+    total_data_size: float | None = Field(alias="totalDataSize")
 
 
 class CurrentRunRef(BaseModel):
