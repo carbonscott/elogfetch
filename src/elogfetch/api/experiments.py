@@ -1,7 +1,5 @@
 """Fetch list of recently updated experiments."""
 
-from __future__ import annotations
-
 import re
 
 from ..utils import get_logger

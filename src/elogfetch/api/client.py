@@ -1,10 +1,8 @@
 """HTTP client with Kerberos authentication for SLAC elog API."""
 
-from __future__ import annotations
-
 import base64
 import subprocess
-from typing import Any, TypeVar
+from typing import Any, Self, TypeVar
 
 import gssapi
 import httpx
@@ -83,7 +81,7 @@ class ElogClient:
         self._session = httpx.AsyncClient(timeout=REQUEST_TIMEOUT)
         self._sync_session = httpx.Client(timeout=REQUEST_TIMEOUT)
 
-    async def __aenter__(self) -> ElogClient:
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *args: object) -> None:

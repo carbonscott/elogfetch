@@ -1,7 +1,5 @@
 """Tests for file locking utilities."""
 
-from __future__ import annotations
-
 import pytest
 
 from elogfetch.exceptions import LockError
