@@ -2,50 +2,35 @@
 
 Fetch LCLS experiment data from the electronic logbook (elog) system and store it in a local SQLite database.
 
-## Installation
+## Prerequisites
 
-This package requires `krtc` which is only available in SLAC conda environments.
+- Python 3.10+
+- `mamba` or `conda` (build-time only, for krb5 headers)
+- SLAC Kerberos credentials (prompted automatically on first use)
 
-### Setup
+## Installation on S3DF
 
-1. Create a `.env` file from the template:
+Authentication uses the `gssapi` package, which can be compiled if we have `krb5-config` binary in our path + related headers `gssapi`-related shared libs. On S3DF we do not have the `krb5-devel` package installed, so that binary is not present. However the `krb5` conda package has that binary, so we can create a minmal conda environment to provide these at build time.
 
-```bash
-cp .env.example .env
-```
-
-1. Edit `.env` to set paths for your environment (`UV_CACHE_DIR` and `UV_PYTHON`)
-
-2. Create a virtual environment and install:
+1. Create a minimal conda environment with the krb5 headers:
 
 ```bash
-set -a; source .env; set +a
-uv venv --python $UV_PYTHON --system-site-packages
-unset UV_PYTHON  # so uv pip targets .venv, not the conda env
-uv pip install -e .
+cd elogfetch
+mamba create --prefix $(pwd)/.krb5 krb5
 ```
 
-1. Activate the environment:
+1. Install dependencies, pointing `gssapi`'s build to the right place:
+
+```bash
+GSSAPI_KRB5CONFIG=$(pwd)/.krb5/bin/krb5-config \
+GSSAPI_MAIN_LIB=/usr/lib64/libgssapi_krb5.so.2 \
+uv sync
+```
+
+1. Activate the virtual environment:
 
 ```bash
 source .venv/bin/activate
-```
-
-### Available conda environments with krtc
-
-```bash
-ls /sdf/group/lcls/ds/ana/sw/conda1/inst/envs/
-```
-
-## Prerequisites
-
-- Valid Kerberos ticket for SLAC authentication
-- Python 3.9+ (from a SLAC conda environment with `krtc`)
-
-Before using, authenticate with Kerberos:
-
-```bash
-kinit
 ```
 
 ## Usage
