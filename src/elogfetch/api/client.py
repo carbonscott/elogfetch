@@ -126,7 +126,52 @@ class ElogClient:
             ) from e
 
     @stamina.retry(on=_is_retryable)
-    async def get(
+    def get(
+        self,
+        endpoint: str,
+        params: dict[str, Any] | None = None,
+        require_auth: bool = True,
+    ) -> dict[str, Any]:
+        """Synchronous GET request for use in ETL and CLI code.
+
+        Mirrors the async get() method but uses a blocking httpx.Client.
+        Transient errors (5xx, network) are retried automatically via stamina.
+
+        Args:
+            endpoint: API endpoint (relative to base URL)
+            params: Query parameters
+            require_auth: Whether to use Kerberos authentication
+
+        Returns:
+            JSON response from the API
+
+        Raises:
+            AuthenticationError: If authentication fails
+        """
+        url = f"{self.base_url}{endpoint}"
+        headers = self._get_auth_headers() if require_auth else {}
+        response = self._sync_session.get(url, headers=headers, params=params)
+
+        if response.status_code == 401 and require_auth:
+            logger.debug(f"Got 401 for {endpoint}, refreshing auth headers")
+            self._auth_headers = None
+            headers = self._get_auth_headers()
+            response = self._sync_session.get(url, headers=headers, params=params)
+            if response.status_code == 401:
+                raise AuthenticationError(
+                    f"Access denied for {endpoint}. Check if you have permission."
+                )
+
+        if response.status_code == 403:
+            raise AuthenticationError(
+                f"Access denied to {endpoint}. You may not have permission."
+            )
+
+        response.raise_for_status()
+        return response.json()
+
+    @stamina.retry(on=_is_retryable)
+    async def get_async(
         self,
         endpoint: str,
         params: dict[str, Any] | None = None,
@@ -188,7 +233,7 @@ class ElogClient:
             Validated Pydantic model instance
         """
         url = endpoint.url(**path_params)
-        data = await self.get(
+        data = await self.get_async(
             url, params=params, require_auth=endpoint.require_auth
         )
         return endpoint.model.model_validate(data)
