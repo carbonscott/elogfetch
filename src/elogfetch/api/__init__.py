@@ -1,6 +1,5 @@
 """API client and modules for fetching elog data."""
 
-from __future__ import annotations
 
 from .client import ElogClient
 from .experiments import fetch_updated_experiments

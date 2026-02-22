@@ -1,6 +1,5 @@
 """Configuration management for elogfetch."""
 
-from __future__ import annotations
 
 import os
 import re

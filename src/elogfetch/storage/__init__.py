@@ -1,6 +1,5 @@
 """Database storage for elogfetch."""
 
-from __future__ import annotations
 
 from .database import Database, find_latest_database, generate_db_name
 from .models import (

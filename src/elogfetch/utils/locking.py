@@ -1,6 +1,5 @@
 """File locking utilities for elogfetch."""
 
-from __future__ import annotations
 
 import fcntl
 from collections.abc import Generator

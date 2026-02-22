@@ -1,6 +1,5 @@
 """Alembic configuration helper for elogfetch SQLModel models."""
 
-from __future__ import annotations
 
 from pathlib import Path
 

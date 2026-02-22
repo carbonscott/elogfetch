@@ -1,6 +1,5 @@
 """Tests for database operations."""
 
-from __future__ import annotations
 
 import sqlite3
 

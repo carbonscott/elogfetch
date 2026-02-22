@@ -1,6 +1,5 @@
 """elogfetch: Fetch LCLS experiment data from the electronic logbook."""
 
-from __future__ import annotations
 
 from .api import ElogClient
 from .config import Config

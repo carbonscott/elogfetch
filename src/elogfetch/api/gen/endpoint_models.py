@@ -18,7 +18,6 @@ Usage::
     endpoint = ENDPOINT_MODELS.get("/lgbk/{experiment_name}/ws/runs")
 """
 
-from __future__ import annotations
 
 from typing import Any
 
