@@ -18,11 +18,32 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import Annotated, Any, Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
 T = TypeVar("T")
+
+# ---------------------------------------------------------------------------
+# Reusable annotated types
+# ---------------------------------------------------------------------------
+
+_SLASH_DATE_FMT = "%m/%d/%Y %H:%M:%S"
+
+
+def _parse_slash_date(value: Any) -> Any:
+    """Convert MM/DD/YYYY HH:MM:SS strings to ISO-8601."""
+    if isinstance(value, str) and "/" in value:
+        try:
+            return datetime.strptime(value, _SLASH_DATE_FMT).isoformat()
+        except ValueError:
+            pass
+    return value
+
+
+# replacement for ``datetime`` fields that may arrive as
+# ``"MM/DD/YYYY HH:MM:SS"`` strings
+SlashDatetime = Annotated[datetime, BeforeValidator(_parse_slash_date)]
 
 # ---------------------------------------------------------------------------
 # Shared model config
@@ -177,9 +198,9 @@ class RunParams(BaseModel):
     n_events: int | None = Field(default=None, alias="DAQ Detector Totals/Events")
     n_damaged: int | None = Field(default=None, alias="DAQ Detector Totals/Damaged")
     n_dropped: int | None = Field(default=None, alias="N dropped Shots")
-    prod_start: datetime | None = Field(default=None, alias="Prod_start")
-    prod_end: datetime | None = Field(default=None, alias="Prod_end")
-    prod_jobstart: datetime | None = Field(default=None, alias="Prod_jobstart")
+    prod_start: SlashDatetime | None = Field(default=None, alias="Prod_start")
+    prod_end: SlashDatetime | None = Field(default=None, alias="Prod_end")
+    prod_jobstart: SlashDatetime | None = Field(default=None, alias="Prod_jobstart")
     detectors: list[RunDetector] | None = Field(default_factory=list)
 
     @model_validator(mode="before")
