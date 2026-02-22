@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import asyncio
+import base64
 import subprocess
 from typing import Any, TypeVar
 
+import gssapi
 import httpx
 import stamina
-from krtc import KerberosTicket
+from gssapi.raw import GSSError
 from pydantic import BaseModel
 
 from ..exceptions import AuthenticationError
@@ -34,6 +35,15 @@ from .gen.models import (
 )
 
 logger = get_logger()
+
+
+def _get_negotiate_token(service: str) -> str:
+    """Generate a Kerberos SPNEGO Negotiate token for the given service principal."""
+    name = gssapi.Name(service, gssapi.NameType.hostbased_service)
+    ctx = gssapi.SecurityContext(name=name, usage="initiate")
+    token = ctx.step()
+    return "Negotiate " + base64.b64encode(token).decode()
+
 
 # Default values (can be overridden via Config)
 DEFAULT_BASE_URL = "https://pswww.slac.stanford.edu"
@@ -79,44 +89,41 @@ class ElogClient:
     async def __aexit__(self, *args: object) -> None:
         await self._session.aclose()
 
-    def _check_kerberos_auth_sync(self) -> bool:
-        """Check if Kerberos authentication is valid (blocking)."""
-        try:
-            result = subprocess.run(
-                ["klist", "-s"],
-                capture_output=True,
-                check=True,
-            )
-            return result.returncode == 0
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            return False
-
-    async def _get_auth_headers(self) -> dict[str, str]:
+    def _get_auth_headers(self) -> dict[str, str]:
         """Get Kerberos authentication headers.
 
-        Returns:
-            Dictionary of HTTP headers with Kerberos authentication
+        If no valid ticket exists, runs kinit interactively to prompt the user
+        for their password, then retries.
 
         Raises:
-            AuthenticationError: If Kerberos ticket is not available
+            AuthenticationError: If Kerberos authentication fails even after kinit
         """
         if self._auth_headers is not None:
             return self._auth_headers
 
-        valid = await asyncio.to_thread(self._check_kerberos_auth_sync)
-        if not valid:
-            raise AuthenticationError(
-                "Kerberos authentication not found or expired. "
-                "Please run 'kinit' to authenticate."
-            )
+        try:
+            token = _get_negotiate_token(self.kerberos_principal)
+            self._auth_headers = {"Authorization": token}
+            return self._auth_headers
+        except GSSError:
+            pass
 
         try:
-            self._auth_headers = await asyncio.to_thread(
-                lambda: KerberosTicket(self.kerberos_principal).getAuthHeaders()
-            )
+            subprocess.run(["kinit"], check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            raise AuthenticationError(
+                "No Kerberos ticket found and kinit failed. "
+                "Please run 'kinit' manually to authenticate."
+            ) from e
+
+        try:
+            token = _get_negotiate_token(self.kerberos_principal)
+            self._auth_headers = {"Authorization": token}
             return self._auth_headers
-        except Exception as e:
-            raise AuthenticationError(f"Failed to get Kerberos ticket: {e}") from e
+        except GSSError as e:
+            raise AuthenticationError(
+                f"Kerberos authentication failed after kinit. ({e})"
+            ) from e
 
     @stamina.retry(on=_is_retryable)
     async def get(
@@ -142,14 +149,14 @@ class ElogClient:
             AuthenticationError: If authentication fails
         """
         url = f"{self.base_url}{endpoint}"
-        headers = await self._get_auth_headers() if require_auth else {}
+        headers = self._get_auth_headers() if require_auth else {}
         response = await self._session.get(url, headers=headers, params=params)
 
         # On 401, refresh the Kerberos ticket and retry once
         if response.status_code == 401 and require_auth:
             logger.debug(f"Got 401 for {endpoint}, refreshing auth headers")
             self._auth_headers = None
-            headers = await self._get_auth_headers()
+            headers = self._get_auth_headers()
             response = await self._session.get(url, headers=headers, params=params)
             if response.status_code == 401:
                 raise AuthenticationError(
@@ -181,7 +188,9 @@ class ElogClient:
             Validated Pydantic model instance
         """
         url = endpoint.url(**path_params)
-        data = await self.get(url, params=params, require_auth=endpoint.require_auth)
+        data = await self.get(
+            url, params=params, require_auth=endpoint.require_auth
+        )
         return endpoint.model.model_validate(data)
 
     async def get_files(self, experiment_id: str) -> FilesResponse:
