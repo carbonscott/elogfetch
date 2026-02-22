@@ -180,6 +180,7 @@ The database is stored as `elog_YYYY_MMDD_HHMM.db` with the following tables:
 
 ```bash
 uv sync
+uv run prek install
 
 # Run tests (use python -m to ensure correct interpreter)
 uv run pytest
