@@ -431,8 +431,8 @@ class Experiment(BaseModel):
     players: list[str] | None = None
     post_players: list[str] | None = None
     run_count: int | None = None
-    total_files: int | None = Field(alias="totalFiles")
-    total_data_size: float | None = Field(alias="totalDataSize")
+    total_files: int | None = Field(default=None, alias="totalFiles")
+    total_data_size: float | None = Field(default=None, alias="totalDataSize")
 
 
 class CurrentRunRef(BaseModel):
