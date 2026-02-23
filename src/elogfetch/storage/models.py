@@ -77,11 +77,6 @@ class Detector(SQLModel, table=True):
     run_detectors: list[RunDetector] = Relationship(back_populates="detector")
 
 
-class Metadata(SQLModel, table=True):
-    key: str = Field(primary_key=True)
-    value: str | None = None
-
-
 # =============================================================================
 # PI extends user with contact info
 # =============================================================================
