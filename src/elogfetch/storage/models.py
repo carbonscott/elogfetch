@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import Any
 
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlmodel import Field, Relationship, SQLModel
 
 # =============================================================================
@@ -211,7 +210,7 @@ class WorkflowDefinition(SQLModel, table=True):
         )
     )
     location: str
-    parameters: dict[str, Any] | None = Field(default=None, sa_column=sa.Column(JSONB))
+    parameters: str | None = None  # raw string as returned by API
     run_param_name: str | None = None
     run_param_value: str | None = None
     run_as_user: str | None = None
