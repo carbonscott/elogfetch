@@ -102,8 +102,8 @@ class Experiment(SQLModel, table=True):
     start_time: datetime = Field(
         sa_column=sa.Column(sa.DateTime(timezone=True), nullable=False)
     )
-    end_time: datetime = Field(
-        sa_column=sa.Column(sa.DateTime(timezone=True), nullable=False)
+    end_time: datetime | None = Field(
+        default=None, sa_column=sa.Column(sa.DateTime(timezone=True), nullable=True)
     )
     pi_id: str = Field(foreign_key="pi.id")
     leader_account: str
