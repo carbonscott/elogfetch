@@ -13,13 +13,11 @@ All GET endpoints follow one of two envelope shapes:
   Special:   {"status": "success", "defs": [...]}  (POC feedback schema only)
 """
 
-from __future__ import annotations
-
 import re as _re
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Any, Generic, TypeVar
+from typing import Annotated, Any, Generic, Self, TypeVar
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
@@ -137,7 +135,7 @@ class ElogEntry(BaseModel):
     shift: str | None = None
     title: str | None = None
     # Populated by complete_elog_tree endpoint
-    children: list[ElogEntry] | None = None
+    children: list[Self] | None = None
     root: str | None = None  # id of root entry
     parent: str | None = None  # id of parent entry
 
@@ -707,7 +705,7 @@ class PocFeedbackSchemaGroup(BaseModel):
     id: str | None = None
     default_value: Any = None
     type: str | None = None  # "Number", "Boolean", "String", etc.
-    groups: list[PocFeedbackSchemaGroup] | None = None
+    groups: list[Self] | None = None
 
 
 PocFeedbackSchemaGroup.model_rebuild()
