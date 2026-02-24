@@ -142,9 +142,6 @@ class Experiment(SQLModel, table=True):
     questionnaire_fields: list[Questionnaire] = Relationship(
         back_populates="experiment"
     )
-    workflow_definitions: list[WorkflowDefinition] = Relationship(
-        back_populates="experiment"
-    )
     runs: list[Run] = Relationship(back_populates="experiment")
     logbook_entries: list[Logbook] = Relationship(back_populates="experiment")
     workflows: list[Workflow] = Relationship(back_populates="experiment")
@@ -211,13 +208,12 @@ class Questionnaire(SQLModel, table=True):
 
 
 # =============================================================================
-# Workflow definitions (templates, per experiment)
+# Workflow definitions
 # =============================================================================
 
 
 class WorkflowDefinition(SQLModel, table=True):
     id: str = Field(primary_key=True)
-    experiment_id: str = Field(foreign_key="experiment.experiment_id", index=True)
     name: str
     executable: str
     trigger: WorkflowTriggerType = Field(
@@ -236,7 +232,6 @@ class WorkflowDefinition(SQLModel, table=True):
     run_param_value: str | None = None
     run_as_user: str | None = None
 
-    experiment: Experiment | None = Relationship(back_populates="workflow_definitions")
     workflows: list[Workflow] = Relationship(back_populates="definition")
 
 
