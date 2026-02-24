@@ -1,232 +1,252 @@
-// elogfetch Database Schema (Revised)
-// Render at https://dbdiagram.io
 
-// =============================================================================
-// Independent lookup / reference tables
-// =============================================================================
-
-Table user {
-  id text [pk, note: 'Linux username, e.g. "swelborn"']
+Enum "workflow_trigger_type" {
+  "MANUAL"
+  "START_OF_RUN"
+  "END_OF_RUN"
+  "FIRST_FILE_TRANSFERRED"
+  "ALL_FILES_TRANSFERRED"
+  "ALL_NONREC_FILES_TRANSFERRED"
+  "RUN_PARAM_IS_VALUE"
 }
 
-Table posix_group {
-  name text [pk, note: 'e.g. "ps-xpp", "ps-mfx"']
+Enum "elog_content_type" {
+  "TEXT"
+  "HTML"
+  "MARKDOWN"
 }
 
-Table detector {
-  id text [pk, note: 'e.g. "DAQ Detectors/Rayonix"']
-  name text [unique, not null]
-  description text
+Table "detector" {
+  "id" TEXT [not null]
+  "name" TEXT [unique, not null]
+  "description" TEXT
+
+  Indexes {
+    id [pk]
+  }
 }
 
-Table metadata {
-  key text [pk]
-  value text
+Table "posix_group" {
+  "name" TEXT [not null]
+
+  Indexes {
+    name [pk]
+  }
 }
 
-// =============================================================================
-// PI extends user with contact info
-// =============================================================================
+Table "user" {
+  "id" TEXT [not null]
 
-Table pi {
-  id text [pk, note: 'FK to user.id']
-  name text [not null]
-  email text [not null]
+  Indexes {
+    id [pk]
+  }
 }
 
-// =============================================================================
-// Junction: users <-> posix_groups (many-to-many)
-// =============================================================================
+Table "workflowdefinition" {
+  "id" TEXT [not null]
+  "name" TEXT [not null]
+  "executable" TEXT [not null]
+  "trigger" workflow_trigger_type [not null]
+  "location" TEXT [not null]
+  "parameters" TEXT
+  "run_param_name" TEXT
+  "run_param_value" TEXT
+  "run_as_user" TEXT
 
-Table user_posix_group {
-  user_id text [not null]
-  posix_group_name text [not null]
+  Indexes {
+    id [pk]
+  }
+}
 
-  indexes {
+Table "pi" {
+  "id" TEXT [not null]
+  "name" TEXT
+  "email" TEXT
+
+  Indexes {
+    id [pk]
+  }
+}
+
+Table "user_posix_group" {
+  "user_id" TEXT [not null]
+  "posix_group_name" TEXT [not null]
+
+  Indexes {
     (user_id, posix_group_name) [pk]
   }
 }
 
-// =============================================================================
-// Experiment (central entity)
-// =============================================================================
+Table "experiment" {
+  "experiment_id" TEXT [not null]
+  "name" TEXT [not null]
+  "instrument" TEXT [not null]
+  "start_time" TIMESTAMPTZ [not null]
+  "end_time" TIMESTAMPTZ
+  "pi_id" TEXT [not null]
+  "leader_account" TEXT [not null]
+  "posix_group" TEXT [not null]
+  "description" TEXT
+  "fetched_at" TIMESTAMPTZ [not null, default: `now()`]
 
-Table experiment {
-  experiment_id text [pk]
-  name text [not null]
-  instrument text [not null]
-  start_time timestamptz [not null]
-  end_time timestamptz [not null]
-  pi_id text [not null, note: 'Single PI per experiment']
-  leader_account text [not null]
-  posix_group text [not null, note: 'One posix group per experiment']
-  description text
+  Indexes {
+    experiment_id [pk]
+    pi_id [name: "ix_experiment_pi_id"]
+  }
 }
 
-Table experiment_slack_channel {
-  experiment_id text [pk, note: 'At most one channel per experiment']
-  channel text [not null, note: 'e.g. "#xpp-elog"']
-}
+Table "experiment_analysis_queue" {
+  "experiment_id" TEXT [not null]
+  "queue" TEXT [not null]
 
-Table experiment_analysis_queue {
-  experiment_id text [not null, note: 'Space-separated in source, normalized here']
-  queue text [not null, note: 'e.g. "ffbh2q"']
-
-  indexes {
+  Indexes {
     (experiment_id, queue) [pk]
   }
 }
 
-// =============================================================================
-// Questionnaire fields (per experiment)
-// =============================================================================
+Table "experiment_slack_channel" {
+  "experiment_id" TEXT [not null]
+  "channel" TEXT [not null]
 
-Table questionnaire {
-  questionnaire_id bigserial [pk]
-  experiment_id text [not null]
-  proposal text
-  category text [not null]
-  field_id text [not null]
-  field_name text
-  field_value text
-  modified_time timestamptz
-  modified_uid text
-  created_time timestamptz [not null, default: `CURRENT_TIMESTAMP`]
-
-  indexes {
-    (experiment_id, field_id) [unique]
-    experiment_id
-    category
+  Indexes {
+    experiment_id [pk]
   }
 }
 
-// =============================================================================
-// Workflow definitions (templates, per experiment)
-// =============================================================================
+Table "questionnaire" {
+  "questionnaire_id" BIGSERIAL [increment]
+  "experiment_id" TEXT [not null]
+  "proposal" TEXT
+  "category" TEXT [not null]
+  "field_id" TEXT [not null]
+  "field_name" TEXT
+  "field_value" TEXT
+  "modified_time" TIMESTAMPTZ
+  "modified_uid" TEXT
+  "created_time" TIMESTAMPTZ [not null]
 
-Table workflowdefinition {
-  id text [pk]
-  experiment_id text [not null]
-  name text [not null]
-  executable text [not null]
-  trigger workflow_trigger_type [not null]
-  location text [not null]
-  parameters jsonb
-  run_param_name text
-  run_param_value text
-  run_as_user text
-}
-
-// =============================================================================
-// Runs (per experiment)
-// =============================================================================
-
-Table run {
-  id text [pk, note: 'MongoDB ObjectId']
-  run_number integer [not null]
-  experiment_id text [not null]
-  start_time timestamptz
-  end_time timestamptz
-
-  indexes {
-    (run_number, experiment_id) [unique]
-    experiment_id
+  Indexes {
+    questionnaire_id [pk]
+    experiment_id [name: "ix_questionnaire_experiment_id"]
   }
 }
 
-// =============================================================================
-// Run production data + file stats (1:1 with run)
-// =============================================================================
+Table "run" {
+  "id" TEXT [not null]
+  "run_number" INTEGER [not null]
+  "experiment_id" TEXT [not null]
+  "start_time" TIMESTAMPTZ
+  "end_time" TIMESTAMPTZ
+  "fetched_at" TIMESTAMPTZ [not null, default: `now()`]
 
-Table run_production_data {
-  run_id text [pk, note: '1:1 with run']
-  experiment_id text [not null, note: 'Denormalized for RLS']
-  n_events bigint
-  n_damaged bigint
-  n_dropped bigint
-  start_timestamp timestamptz
-  end_timestamp timestamptz
-  file_count bigint [note: 'Merged from runfiles']
-  file_size_bytes bigint [note: 'Merged from runfiles']
+  Indexes {
+    id [pk]
+    experiment_id [name: "ix_run_experiment_id"]
+  }
 }
 
-// =============================================================================
-// Run <-> Detector junction
-// =============================================================================
+Table "logbook" {
+  "id" TEXT [not null]
+  "experiment_id" TEXT [not null]
+  "run_id" TEXT
+  "created_time" TIMESTAMPTZ [not null]
+  "content" TEXT
+  "content_type" elog_content_type [not null]
+  "tags" BLOB
+  "author" TEXT [not null]
 
-Table run_detector {
-  run_id text [not null]
-  detector_id text [not null]
-  experiment_id text [not null, note: 'Denormalized for RLS']
-  value text [not null]
+  Indexes {
+    id [pk]
+    experiment_id [name: "ix_logbook_experiment_id"]
+    run_id [name: "ix_logbook_run_id"]
+  }
+}
 
-  indexes {
+Table "run_detector" {
+  "run_id" TEXT [not null]
+  "detector_id" TEXT [not null]
+  "experiment_id" TEXT [not null]
+  "value" TEXT [not null]
+
+  Indexes {
     (run_id, detector_id) [pk]
+    detector_id [name: "ix_run_detector_detector_id"]
+    experiment_id [name: "ix_run_detector_experiment_id"]
   }
 }
 
-// =============================================================================
-// Logbook entries
-// =============================================================================
+Table "run_production_data" {
+  "run_id" TEXT [not null]
+  "experiment_id" TEXT [not null]
+  "n_events" BIGINT
+  "n_damaged" BIGINT
+  "n_dropped" BIGINT
+  "start_timestamp" TIMESTAMPTZ
+  "end_timestamp" TIMESTAMPTZ
+  "file_count" BIGINT
+  "file_size_bytes" BIGINT
 
-Table logbook {
-  id text [pk]
-  experiment_id text [not null]
-  run_id text [note: 'Nullable - not all entries tied to a run']
-  created_time timestamptz [not null]
-  content text
-  content_type elog_content_type [not null, default: 'TEXT']
-  tags "text[]" [note: 'PostgreSQL array']
-  author text [not null]
+  Indexes {
+    run_id [pk]
+    experiment_id [name: "ix_run_production_data_experiment_id"]
+  }
 }
 
-// =============================================================================
-// Workflow executions (job runs)
-// =============================================================================
+Table "workflow" {
+  "id" TEXT [not null]
+  "experiment_id" TEXT [not null]
+  "run_id" TEXT [not null]
+  "def_id" TEXT [not null]
+  "user_id" TEXT [not null]
+  "status" TEXT [not null]
+  "submit_time" TIMESTAMPTZ [not null]
+  "tool_id" BIGINT
+  "log_file_path" TEXT
 
-Table workflow {
-  id text [pk]
-  experiment_id text [not null, note: 'Denormalized for RLS']
-  run_id text [not null]
-  def_id text [not null]
-  user_id text [not null]
-  status text [not null]
-  submit_time timestamptz [not null]
-  tool_id bigint
-  log_file_path text
+  Indexes {
+    id [pk]
+    def_id [name: "ix_workflow_def_id"]
+    experiment_id [name: "ix_workflow_experiment_id"]
+    run_id [name: "ix_workflow_run_id"]
+    user_id [name: "ix_workflow_user_id"]
+  }
 }
 
-// =============================================================================
-// Relationships
-// =============================================================================
+Ref:"user"."id" < "pi"."id" [update: no action, delete: cascade]
 
-// Identity & access
-Ref: pi.id > user.id
-Ref: user_posix_group.user_id > user.id
-Ref: user_posix_group.posix_group_name > posix_group.name
-Ref: experiment.pi_id > pi.id
-Ref: experiment.posix_group > posix_group.name
+Ref:"posix_group"."name" < "user_posix_group"."posix_group_name" [update: no action, delete: cascade]
 
-// Experiment auxiliary
-Ref: experiment_slack_channel.experiment_id > experiment.experiment_id
-Ref: experiment_analysis_queue.experiment_id > experiment.experiment_id
+Ref:"user"."id" < "user_posix_group"."user_id" [update: no action, delete: cascade]
 
-// Experiment children
-Ref: questionnaire.experiment_id > experiment.experiment_id
-Ref: workflowdefinition.experiment_id > experiment.experiment_id
-Ref: run.experiment_id > experiment.experiment_id
-Ref: logbook.experiment_id > experiment.experiment_id
-Ref: workflow.experiment_id > experiment.experiment_id
+Ref:"pi"."id" < "experiment"."pi_id" [update: no action, delete: no action]
 
-// Run children
-Ref: run_production_data.run_id - run.id
-Ref: run_production_data.experiment_id > experiment.experiment_id
-Ref: run_detector.run_id > run.id
-Ref: run_detector.detector_id > detector.id
-Ref: run_detector.experiment_id > experiment.experiment_id
-Ref: logbook.run_id > run.id
+Ref:"posix_group"."name" < "experiment"."posix_group" [update: no action, delete: no action]
 
-// Workflow execution refs
-Ref: workflow.run_id > run.id
-Ref: workflow.def_id > workflowdefinition.id
-Ref: workflow.user_id > user.id
+Ref:"experiment"."experiment_id" < "experiment_analysis_queue"."experiment_id" [update: no action, delete: cascade]
+
+Ref:"experiment"."experiment_id" < "experiment_slack_channel"."experiment_id" [update: no action, delete: cascade]
+
+Ref:"experiment"."experiment_id" < "questionnaire"."experiment_id" [update: no action, delete: cascade]
+
+Ref:"experiment"."experiment_id" < "run"."experiment_id" [update: no action, delete: cascade]
+
+Ref:"experiment"."experiment_id" < "logbook"."experiment_id" [update: no action, delete: cascade]
+
+Ref:"run"."id" < "logbook"."run_id" [update: no action, delete: set null]
+
+Ref:"detector"."id" < "run_detector"."detector_id" [update: no action, delete: restrict]
+
+Ref:"experiment"."experiment_id" < "run_detector"."experiment_id" [update: no action, delete: cascade]
+
+Ref:"run"."id" < "run_detector"."run_id" [update: no action, delete: cascade]
+
+Ref:"experiment"."experiment_id" < "run_production_data"."experiment_id" [update: no action, delete: cascade]
+
+Ref:"run"."id" < "run_production_data"."run_id" [update: no action, delete: cascade]
+
+Ref:"workflowdefinition"."id" < "workflow"."def_id" [update: no action, delete: restrict]
+
+Ref:"experiment"."experiment_id" < "workflow"."experiment_id" [update: no action, delete: cascade]
+
+Ref:"run"."id" < "workflow"."run_id" [update: no action, delete: restrict]
+
+Ref:"user"."id" < "workflow"."user_id" [update: no action, delete: restrict]

@@ -1,287 +1,185 @@
--- Revised schema for elogfetch (PostgreSQL)
+-- PostgreSQL schema for elogfetch
+-- Auto-generated from SQLModel metadata via scripts/gen_ddl.py
+-- DO NOT EDIT MANUALLY — run `make schema` to regenerate.
 --
--- Changes from original_proposed.sql:
---   1. Fixed reversed FKs: experiment → pi, pi → user (not the other way around)
---   2. Replaced user.posix_group column with posix_group table + user_posix_group junction
---   3. Fixed type mismatches: run_id and detector_id FKs now TEXT to match their targets
---   4. run.run_number is UNIQUE(run_number, experiment_id), not globally unique
---   5. Merged runfiles into run_production_data (file_count, file_size_bytes)
---   6. workflow.run_num → workflow.run_id (FK to run.id) since run_number isn't globally unique
---   7. Added experiment_id to run_production_data, run_detector, workflow for RLS support
---   8. Made nullable columns explicit (description, timestamps, etc.)
---   9. Moved slack_channels and analysis_queues out of experiment into auxiliary tables
---      (slack_channel: at most one per experiment; analysis_queue: multiple per experiment)
---  10. Added PostgreSQL ENUMs for columns with fixed value sets:
---      workflow_trigger_type (workflowdefinition.trigger),
---      elog_content_type (logbook.content_type — also added missing column)
+-- Design decisions are documented in the migration files under
+-- src/elogfetch/alembic/versions/.
 
-
--- =============================================================================
 -- ENUMs
--- =============================================================================
+CREATE TYPE workflow_trigger_type AS ENUM ('MANUAL', 'START_OF_RUN', 'END_OF_RUN', 'FIRST_FILE_TRANSFERRED', 'ALL_FILES_TRANSFERRED', 'ALL_NONREC_FILES_TRANSFERRED', 'RUN_PARAM_IS_VALUE');
+CREATE TYPE elog_content_type AS ENUM ('TEXT', 'HTML', 'MARKDOWN');
 
--- Values from WorkflowTrigger in api/gen/models.py.
--- Note: the API marks trigger as "WorkflowTrigger or free-form legacy value"
--- so ETL may need to handle unknown values gracefully.
-CREATE TYPE workflow_trigger_type AS ENUM (
-    'MANUAL',
-    'START_OF_RUN',
-    'END_OF_RUN',
-    'FIRST_FILE_TRANSFERRED',
-    'ALL_FILES_TRANSFERRED',
-    'ALL_NONREC_FILES_TRANSFERRED',
-    'RUN_PARAM_IS_VALUE'
+
+CREATE TABLE detector (
+	id VARCHAR NOT NULL, 
+	name VARCHAR NOT NULL, 
+	description VARCHAR, 
+	PRIMARY KEY (id), 
+	UNIQUE (name)
 );
 
--- Values from ElogContentType in api/gen/models.py.
-CREATE TYPE elog_content_type AS ENUM (
-    'TEXT',
-    'HTML',
-    'MARKDOWN'
+CREATE TABLE posix_group (
+	name VARCHAR NOT NULL, 
+	PRIMARY KEY (name)
 );
 
-
--- =============================================================================
--- Independent lookup / reference tables (no FKs to other tables)
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS "user" (
-    "id" TEXT NOT NULL,                         -- Linux username (e.g. "swelborn")
-    PRIMARY KEY("id")
+CREATE TABLE "user" (
+	id VARCHAR NOT NULL, 
+	PRIMARY KEY (id)
 );
 
-
-CREATE TABLE IF NOT EXISTS "posix_group" (
-    "name" TEXT NOT NULL,                       -- e.g. "ps-xpp", "ps-mfx"
-    PRIMARY KEY("name")
+CREATE TABLE workflowdefinition (
+	id VARCHAR NOT NULL, 
+	name VARCHAR NOT NULL, 
+	executable VARCHAR NOT NULL, 
+	trigger workflow_trigger_type NOT NULL, 
+	location VARCHAR NOT NULL, 
+	parameters VARCHAR, 
+	run_param_name VARCHAR, 
+	run_param_value VARCHAR, 
+	run_as_user VARCHAR, 
+	PRIMARY KEY (id)
 );
 
-
-CREATE TABLE IF NOT EXISTS "detector" (
-    "id" TEXT NOT NULL,                         -- e.g. "DAQ Detectors/Rayonix"
-    "name" TEXT NOT NULL UNIQUE,
-    "description" TEXT,
-    PRIMARY KEY("id")
+CREATE TABLE pi (
+	id VARCHAR NOT NULL, 
+	name VARCHAR, 
+	email VARCHAR, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(id) REFERENCES "user" (id) ON DELETE CASCADE
 );
 
-
-CREATE TABLE IF NOT EXISTS "metadata" (
-    "key" TEXT NOT NULL,
-    "value" TEXT,
-    PRIMARY KEY("key")
+CREATE TABLE user_posix_group (
+	user_id VARCHAR NOT NULL, 
+	posix_group_name VARCHAR NOT NULL, 
+	PRIMARY KEY (user_id, posix_group_name), 
+	FOREIGN KEY(user_id) REFERENCES "user" (id) ON DELETE CASCADE, 
+	FOREIGN KEY(posix_group_name) REFERENCES posix_group (name) ON DELETE CASCADE
 );
 
+CREATE TABLE experiment (
+	experiment_id VARCHAR NOT NULL, 
+	name VARCHAR NOT NULL, 
+	instrument VARCHAR NOT NULL, 
+	start_time TIMESTAMP WITH TIME ZONE NOT NULL, 
+	end_time TIMESTAMP WITH TIME ZONE, 
+	pi_id VARCHAR NOT NULL, 
+	leader_account VARCHAR NOT NULL, 
+	posix_group VARCHAR NOT NULL, 
+	description VARCHAR, 
+	fetched_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (experiment_id), 
+	FOREIGN KEY(pi_id) REFERENCES pi (id), 
+	FOREIGN KEY(posix_group) REFERENCES posix_group (name)
+);
+CREATE INDEX ix_experiment_pi_id ON experiment (pi_id);
 
--- =============================================================================
--- PI extends user with contact info
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS "pi" (
-    "id" TEXT NOT NULL,                         -- FK to user.id
-    "name" TEXT NOT NULL,
-    "email" TEXT NOT NULL,
-    PRIMARY KEY("id"),
-    FOREIGN KEY("id") REFERENCES "user"("id")
+CREATE TABLE experiment_analysis_queue (
+	experiment_id VARCHAR NOT NULL, 
+	queue VARCHAR NOT NULL, 
+	PRIMARY KEY (experiment_id, queue), 
+	FOREIGN KEY(experiment_id) REFERENCES experiment (experiment_id) ON DELETE CASCADE
 );
 
-
--- =============================================================================
--- Junction: users ↔ posix_groups (many-to-many)
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS "user_posix_group" (
-    "user_id" TEXT NOT NULL,
-    "posix_group_name" TEXT NOT NULL,
-    PRIMARY KEY("user_id", "posix_group_name"),
-    FOREIGN KEY("user_id") REFERENCES "user"("id"),
-    FOREIGN KEY("posix_group_name") REFERENCES "posix_group"("name")
+CREATE TABLE experiment_slack_channel (
+	experiment_id VARCHAR NOT NULL, 
+	channel VARCHAR NOT NULL, 
+	PRIMARY KEY (experiment_id), 
+	FOREIGN KEY(experiment_id) REFERENCES experiment (experiment_id) ON DELETE CASCADE
 );
 
-
--- =============================================================================
--- Experiment (central entity)
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS "experiment" (
-    "experiment_id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "instrument" TEXT NOT NULL,
-    "start_time" TIMESTAMPTZ NOT NULL,
-    "end_time" TIMESTAMPTZ NOT NULL,
-    "pi_id" TEXT NOT NULL,                      -- FK to pi.id (single PI per experiment)
-    "leader_account" TEXT NOT NULL,
-    "posix_group" TEXT NOT NULL,                -- FK to posix_group.name
-    "description" TEXT,
-    PRIMARY KEY("experiment_id"),
-    FOREIGN KEY("pi_id") REFERENCES "pi"("id"),
-    FOREIGN KEY("posix_group") REFERENCES "posix_group"("name")
+CREATE TABLE questionnaire (
+	questionnaire_id BIGSERIAL NOT NULL, 
+	experiment_id VARCHAR NOT NULL, 
+	proposal VARCHAR, 
+	category VARCHAR NOT NULL, 
+	field_id VARCHAR NOT NULL, 
+	field_name VARCHAR, 
+	field_value VARCHAR, 
+	modified_time TIMESTAMP WITH TIME ZONE, 
+	modified_uid VARCHAR, 
+	created_time TIMESTAMP WITH TIME ZONE NOT NULL, 
+	PRIMARY KEY (questionnaire_id), 
+	CONSTRAINT uq_questionnaire_exp_field UNIQUE (experiment_id, field_id), 
+	FOREIGN KEY(experiment_id) REFERENCES experiment (experiment_id) ON DELETE CASCADE
 );
+CREATE INDEX ix_questionnaire_experiment_id ON questionnaire (experiment_id);
 
-
--- =============================================================================
--- Experiment auxiliary tables (operational config, extensible)
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS "experiment_slack_channel" (
-    "experiment_id" TEXT NOT NULL,              -- at most one channel per experiment
-    "channel" TEXT NOT NULL,                    -- e.g. "#xpp-elog"
-    PRIMARY KEY("experiment_id"),
-    FOREIGN KEY("experiment_id") REFERENCES "experiment"("experiment_id")
+CREATE TABLE run (
+	id VARCHAR NOT NULL, 
+	run_number INTEGER NOT NULL, 
+	experiment_id VARCHAR NOT NULL, 
+	start_time TIMESTAMP WITH TIME ZONE, 
+	end_time TIMESTAMP WITH TIME ZONE, 
+	fetched_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_run_number_exp UNIQUE (run_number, experiment_id), 
+	FOREIGN KEY(experiment_id) REFERENCES experiment (experiment_id) ON DELETE CASCADE
 );
+CREATE INDEX ix_run_experiment_id ON run (experiment_id);
 
-
-CREATE TABLE IF NOT EXISTS "experiment_analysis_queue" (
-    "experiment_id" TEXT NOT NULL,              -- space-separated in source, normalized here
-    "queue" TEXT NOT NULL,                      -- e.g. "ffbh2q"
-    PRIMARY KEY("experiment_id", "queue"),
-    FOREIGN KEY("experiment_id") REFERENCES "experiment"("experiment_id")
+CREATE TABLE logbook (
+	id VARCHAR NOT NULL, 
+	experiment_id VARCHAR NOT NULL, 
+	run_id VARCHAR, 
+	created_time TIMESTAMP WITH TIME ZONE NOT NULL, 
+	content VARCHAR, 
+	content_type elog_content_type NOT NULL, 
+	tags VARCHAR[], 
+	author VARCHAR NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(experiment_id) REFERENCES experiment (experiment_id) ON DELETE CASCADE, 
+	FOREIGN KEY(run_id) REFERENCES run (id) ON DELETE SET NULL
 );
+CREATE INDEX ix_logbook_run_id ON logbook (run_id);
+CREATE INDEX ix_logbook_experiment_id ON logbook (experiment_id);
 
-
--- =============================================================================
--- Questionnaire fields (per experiment)
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS "questionnaire" (
-    "questionnaire_id" BIGSERIAL,
-    "experiment_id" TEXT NOT NULL,
-    "proposal" TEXT,
-    "category" TEXT NOT NULL,
-    "field_id" TEXT NOT NULL,
-    "field_name" TEXT,
-    "field_value" TEXT,
-    "modified_time" TIMESTAMPTZ,
-    "modified_uid" TEXT,
-    "created_time" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY("questionnaire_id"),
-    UNIQUE("experiment_id", "field_id"),
-    FOREIGN KEY("experiment_id") REFERENCES "experiment"("experiment_id")
+CREATE TABLE run_detector (
+	run_id VARCHAR NOT NULL, 
+	detector_id VARCHAR NOT NULL, 
+	experiment_id VARCHAR NOT NULL, 
+	value VARCHAR NOT NULL, 
+	PRIMARY KEY (run_id, detector_id), 
+	FOREIGN KEY(run_id) REFERENCES run (id) ON DELETE CASCADE, 
+	FOREIGN KEY(detector_id) REFERENCES detector (id) ON DELETE RESTRICT, 
+	FOREIGN KEY(experiment_id) REFERENCES experiment (experiment_id) ON DELETE CASCADE
 );
+CREATE INDEX ix_run_detector_detector_id ON run_detector (detector_id);
+CREATE INDEX ix_run_detector_experiment_id ON run_detector (experiment_id);
 
-
--- =============================================================================
--- Workflow definitions (templates, per experiment)
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS "workflowdefinition" (
-    "id" TEXT NOT NULL,
-    "experiment_id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "executable" TEXT NOT NULL,
-    "trigger" workflow_trigger_type NOT NULL,
-    "location" TEXT NOT NULL,
-    "parameters" JSONB,                         -- workflow parameter dict
-    "run_param_name" TEXT,
-    "run_param_value" TEXT,
-    "run_as_user" TEXT,
-    PRIMARY KEY("id"),
-    FOREIGN KEY("experiment_id") REFERENCES "experiment"("experiment_id")
+CREATE TABLE run_production_data (
+	run_id VARCHAR NOT NULL, 
+	experiment_id VARCHAR NOT NULL, 
+	n_events BIGINT, 
+	n_damaged BIGINT, 
+	n_dropped BIGINT, 
+	start_timestamp TIMESTAMP WITH TIME ZONE, 
+	end_timestamp TIMESTAMP WITH TIME ZONE, 
+	file_count BIGINT, 
+	file_size_bytes BIGINT, 
+	PRIMARY KEY (run_id), 
+	FOREIGN KEY(run_id) REFERENCES run (id) ON DELETE CASCADE, 
+	FOREIGN KEY(experiment_id) REFERENCES experiment (experiment_id) ON DELETE CASCADE
 );
+CREATE INDEX ix_run_production_data_experiment_id ON run_production_data (experiment_id);
 
-
--- =============================================================================
--- Runs (per experiment)
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS "run" (
-    "id" TEXT NOT NULL,                         -- MongoDB ObjectId (e.g. "68040f4f84929222f10ffef4")
-    "run_number" INTEGER NOT NULL,
-    "experiment_id" TEXT NOT NULL,
-    "start_time" TIMESTAMPTZ,
-    "end_time" TIMESTAMPTZ,
-    PRIMARY KEY("id"),
-    UNIQUE("run_number", "experiment_id"),      -- run_number is unique per experiment, not globally
-    FOREIGN KEY("experiment_id") REFERENCES "experiment"("experiment_id")
+CREATE TABLE workflow (
+	id VARCHAR NOT NULL, 
+	experiment_id VARCHAR NOT NULL, 
+	run_id VARCHAR NOT NULL, 
+	def_id VARCHAR NOT NULL, 
+	user_id VARCHAR NOT NULL, 
+	status VARCHAR NOT NULL, 
+	submit_time TIMESTAMP WITH TIME ZONE NOT NULL, 
+	tool_id BIGINT, 
+	log_file_path VARCHAR, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(experiment_id) REFERENCES experiment (experiment_id) ON DELETE CASCADE, 
+	FOREIGN KEY(run_id) REFERENCES run (id) ON DELETE RESTRICT, 
+	FOREIGN KEY(def_id) REFERENCES workflowdefinition (id) ON DELETE RESTRICT, 
+	FOREIGN KEY(user_id) REFERENCES "user" (id) ON DELETE RESTRICT
 );
-
-
--- =============================================================================
--- Run production data + file stats (1:1 with run, merged from runfiles)
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS "run_production_data" (
-    "run_id" TEXT NOT NULL,                     -- FK to run.id (TEXT, not INTEGER)
-    "experiment_id" TEXT NOT NULL,              -- denormalized for RLS
-    "n_events" BIGINT,
-    "n_damaged" BIGINT,
-    "n_dropped" BIGINT,
-    "start_timestamp" TIMESTAMPTZ,
-    "end_timestamp" TIMESTAMPTZ,
-    "file_count" BIGINT,                        -- merged from runfiles.count
-    "file_size_bytes" BIGINT,                   -- merged from runfiles.size
-    PRIMARY KEY("run_id"),
-    FOREIGN KEY("run_id") REFERENCES "run"("id"),
-    FOREIGN KEY("experiment_id") REFERENCES "experiment"("experiment_id")
-);
-
-
--- =============================================================================
--- Run ↔ Detector junction (with status value)
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS "run_detector" (
-    "run_id" TEXT NOT NULL,                     -- FK to run.id (TEXT)
-    "detector_id" TEXT NOT NULL,                -- FK to detector.id (TEXT)
-    "experiment_id" TEXT NOT NULL,              -- denormalized for RLS
-    "value" TEXT NOT NULL,
-    PRIMARY KEY("run_id", "detector_id"),
-    FOREIGN KEY("run_id") REFERENCES "run"("id"),
-    FOREIGN KEY("detector_id") REFERENCES "detector"("id"),
-    FOREIGN KEY("experiment_id") REFERENCES "experiment"("experiment_id")
-);
-
-
--- =============================================================================
--- Logbook entries
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS "logbook" (
-    "id" TEXT NOT NULL,
-    "experiment_id" TEXT NOT NULL,
-    "run_id" TEXT,                              -- nullable: not all entries are tied to a run
-    "created_time" TIMESTAMPTZ NOT NULL,
-    "content" TEXT,
-    "content_type" elog_content_type NOT NULL DEFAULT 'TEXT',
-    "tags" TEXT[],                              -- PostgreSQL array
-    "author" TEXT NOT NULL,
-    PRIMARY KEY("id"),
-    FOREIGN KEY("experiment_id") REFERENCES "experiment"("experiment_id"),
-    FOREIGN KEY("run_id") REFERENCES "run"("id")
-);
-
-
--- =============================================================================
--- Workflow executions (job runs, references a definition)
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS "workflow" (
-    "id" TEXT NOT NULL,
-    "experiment_id" TEXT NOT NULL,              -- denormalized for RLS
-    "run_id" TEXT NOT NULL,                     -- FK to run.id (replaces run_num since run_number isn't globally unique)
-    "def_id" TEXT NOT NULL,                     -- FK to workflowdefinition.id
-    "user_id" TEXT NOT NULL,                     -- FK to user.id
-    "status" TEXT NOT NULL,
-    "submit_time" TIMESTAMPTZ NOT NULL,
-    "tool_id" BIGINT,
-    "log_file_path" TEXT,
-    PRIMARY KEY("id"),
-    FOREIGN KEY("experiment_id") REFERENCES "experiment"("experiment_id"),
-    FOREIGN KEY("run_id") REFERENCES "run"("id"),
-    FOREIGN KEY("def_id") REFERENCES "workflowdefinition"("id"),
-    FOREIGN KEY("user_id") REFERENCES "user"("id")
-);
-
-
--- =============================================================================
--- Indexes
--- =============================================================================
-
-CREATE INDEX IF NOT EXISTS idx_questionnaire_experiment ON "questionnaire"("experiment_id");
-CREATE INDEX IF NOT EXISTS idx_run_experiment ON "run"("experiment_id");
-CREATE INDEX IF NOT EXISTS idx_run_production_data_experiment ON "run_production_data"("experiment_id");
-CREATE INDEX IF NOT EXISTS idx_run_detector_experiment ON "run_detector"("experiment_id");
-CREATE INDEX IF NOT EXISTS idx_logbook_experiment ON "logbook"("experiment_id");
-CREATE INDEX IF NOT EXISTS idx_logbook_run ON "logbook"("run_id");
-CREATE INDEX IF NOT EXISTS idx_workflow_experiment ON "workflow"("experiment_id");
-CREATE INDEX IF NOT EXISTS idx_workflow_def ON "workflow"("def_id");
-CREATE INDEX IF NOT EXISTS idx_workflowdefinition_experiment ON "workflowdefinition"("experiment_id");
+CREATE INDEX ix_workflow_run_id ON workflow (run_id);
+CREATE INDEX ix_workflow_user_id ON workflow (user_id);
+CREATE INDEX ix_workflow_experiment_id ON workflow (experiment_id);
+CREATE INDEX ix_workflow_def_id ON workflow (def_id);
