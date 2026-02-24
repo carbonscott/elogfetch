@@ -29,12 +29,6 @@ def upgrade():
         sa.UniqueConstraint("name"),
     )
     op.create_table(
-        "metadata",
-        sa.Column("key", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("value", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.PrimaryKeyConstraint("key"),
-    )
-    op.create_table(
         "posix_group",
         sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.PrimaryKeyConstraint("name"),
@@ -45,14 +39,37 @@ def upgrade():
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_table(
-        "pi",
+        "workflowdefinition",
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("email", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["id"],
-            ["user.id"],
+        sa.Column("executable", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column(
+            "trigger",
+            sa.Enum(
+                "MANUAL",
+                "START_OF_RUN",
+                "END_OF_RUN",
+                "FIRST_FILE_TRANSFERRED",
+                "ALL_FILES_TRANSFERRED",
+                "ALL_NONREC_FILES_TRANSFERRED",
+                "RUN_PARAM_IS_VALUE",
+                name="workflow_trigger_type",
+            ),
+            nullable=False,
         ),
+        sa.Column("location", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("parameters", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("run_param_name", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("run_param_value", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("run_as_user", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_table(
+        "pi",
+        sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("email", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.ForeignKeyConstraint(["id"], ["user.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_table(
@@ -62,13 +79,9 @@ def upgrade():
             "posix_group_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False
         ),
         sa.ForeignKeyConstraint(
-            ["posix_group_name"],
-            ["posix_group.name"],
+            ["posix_group_name"], ["posix_group.name"], ondelete="CASCADE"
         ),
-        sa.ForeignKeyConstraint(
-            ["user_id"],
-            ["user.id"],
-        ),
+        sa.ForeignKeyConstraint(["user_id"], ["user.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("user_id", "posix_group_name"),
     )
     op.create_table(
@@ -77,11 +90,17 @@ def upgrade():
         sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("instrument", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("start_time", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("end_time", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("end_time", sa.DateTime(timezone=True), nullable=True),
         sa.Column("pi_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("leader_account", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("posix_group", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("description", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column(
+            "fetched_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(
             ["pi_id"],
             ["pi.id"],
@@ -92,13 +111,13 @@ def upgrade():
         ),
         sa.PrimaryKeyConstraint("experiment_id"),
     )
+    op.create_index(op.f("ix_experiment_pi_id"), "experiment", ["pi_id"], unique=False)
     op.create_table(
         "experiment_analysis_queue",
         sa.Column("experiment_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("queue", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.ForeignKeyConstraint(
-            ["experiment_id"],
-            ["experiment.experiment_id"],
+            ["experiment_id"], ["experiment.experiment_id"], ondelete="CASCADE"
         ),
         sa.PrimaryKeyConstraint("experiment_id", "queue"),
     )
@@ -107,8 +126,7 @@ def upgrade():
         sa.Column("experiment_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("channel", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.ForeignKeyConstraint(
-            ["experiment_id"],
-            ["experiment.experiment_id"],
+            ["experiment_id"], ["experiment.experiment_id"], ondelete="CASCADE"
         ),
         sa.PrimaryKeyConstraint("experiment_id"),
     )
@@ -127,8 +145,7 @@ def upgrade():
         sa.Column("modified_uid", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("created_time", sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(
-            ["experiment_id"],
-            ["experiment.experiment_id"],
+            ["experiment_id"], ["experiment.experiment_id"], ondelete="CASCADE"
         ),
         sa.PrimaryKeyConstraint("questionnaire_id"),
         sa.UniqueConstraint(
@@ -148,52 +165,20 @@ def upgrade():
         sa.Column("experiment_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("start_time", sa.DateTime(timezone=True), nullable=True),
         sa.Column("end_time", sa.DateTime(timezone=True), nullable=True),
+        sa.Column(
+            "fetched_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(
-            ["experiment_id"],
-            ["experiment.experiment_id"],
+            ["experiment_id"], ["experiment.experiment_id"], ondelete="CASCADE"
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("run_number", "experiment_id", name="uq_run_number_exp"),
     )
     op.create_index(
         op.f("ix_run_experiment_id"), "run", ["experiment_id"], unique=False
-    )
-    op.create_table(
-        "workflowdefinition",
-        sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("experiment_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("executable", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column(
-            "trigger",
-            sa.Enum(
-                "MANUAL",
-                "START_OF_RUN",
-                "END_OF_RUN",
-                "FIRST_FILE_TRANSFERRED",
-                "ALL_FILES_TRANSFERRED",
-                "ALL_NONREC_FILES_TRANSFERRED",
-                "RUN_PARAM_IS_VALUE",
-                name="workflow_trigger_type",
-            ),
-            nullable=False,
-        ),
-        sa.Column("location", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("parameters", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column("run_param_name", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("run_param_value", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("run_as_user", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.ForeignKeyConstraint(
-            ["experiment_id"],
-            ["experiment.experiment_id"],
-        ),
-        sa.PrimaryKeyConstraint("id"),
-    )
-    op.create_index(
-        op.f("ix_workflowdefinition_experiment_id"),
-        "workflowdefinition",
-        ["experiment_id"],
-        unique=False,
     )
     op.create_table(
         "logbook",
@@ -207,16 +192,14 @@ def upgrade():
             sa.Enum("TEXT", "HTML", "MARKDOWN", name="elog_content_type"),
             nullable=False,
         ),
-        sa.Column("tags", postgresql.ARRAY(sa.Text()), nullable=True),
+        sa.Column(
+            "tags", postgresql.ARRAY(sqlmodel.sql.sqltypes.AutoString()), nullable=True
+        ),
         sa.Column("author", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.ForeignKeyConstraint(
-            ["experiment_id"],
-            ["experiment.experiment_id"],
+            ["experiment_id"], ["experiment.experiment_id"], ondelete="CASCADE"
         ),
-        sa.ForeignKeyConstraint(
-            ["run_id"],
-            ["run.id"],
-        ),
+        sa.ForeignKeyConstraint(["run_id"], ["run.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
@@ -229,19 +212,15 @@ def upgrade():
         sa.Column("detector_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("experiment_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("value", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.ForeignKeyConstraint(["detector_id"], ["detector.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
-            ["detector_id"],
-            ["detector.id"],
+            ["experiment_id"], ["experiment.experiment_id"], ondelete="CASCADE"
         ),
-        sa.ForeignKeyConstraint(
-            ["experiment_id"],
-            ["experiment.experiment_id"],
-        ),
-        sa.ForeignKeyConstraint(
-            ["run_id"],
-            ["run.id"],
-        ),
+        sa.ForeignKeyConstraint(["run_id"], ["run.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("run_id", "detector_id"),
+    )
+    op.create_index(
+        "ix_run_detector_detector_id", "run_detector", ["detector_id"], unique=False
     )
     op.create_index(
         op.f("ix_run_detector_experiment_id"),
@@ -261,13 +240,9 @@ def upgrade():
         sa.Column("file_count", sa.BigInteger(), nullable=True),
         sa.Column("file_size_bytes", sa.BigInteger(), nullable=True),
         sa.ForeignKeyConstraint(
-            ["experiment_id"],
-            ["experiment.experiment_id"],
+            ["experiment_id"], ["experiment.experiment_id"], ondelete="CASCADE"
         ),
-        sa.ForeignKeyConstraint(
-            ["run_id"],
-            ["run.id"],
-        ),
+        sa.ForeignKeyConstraint(["run_id"], ["run.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("run_id"),
     )
     op.create_index(
@@ -288,32 +263,28 @@ def upgrade():
         sa.Column("tool_id", sa.BigInteger(), nullable=True),
         sa.Column("log_file_path", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.ForeignKeyConstraint(
-            ["def_id"],
-            ["workflowdefinition.id"],
+            ["def_id"], ["workflowdefinition.id"], ondelete="RESTRICT"
         ),
         sa.ForeignKeyConstraint(
-            ["experiment_id"],
-            ["experiment.experiment_id"],
+            ["experiment_id"], ["experiment.experiment_id"], ondelete="CASCADE"
         ),
-        sa.ForeignKeyConstraint(
-            ["run_id"],
-            ["run.id"],
-        ),
-        sa.ForeignKeyConstraint(
-            ["user_id"],
-            ["user.id"],
-        ),
+        sa.ForeignKeyConstraint(["run_id"], ["run.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["user_id"], ["user.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_workflow_def_id"), "workflow", ["def_id"], unique=False)
     op.create_index(
         op.f("ix_workflow_experiment_id"), "workflow", ["experiment_id"], unique=False
     )
+    op.create_index(op.f("ix_workflow_run_id"), "workflow", ["run_id"], unique=False)
+    op.create_index(op.f("ix_workflow_user_id"), "workflow", ["user_id"], unique=False)
     # ### end Alembic commands ###
 
 
 def downgrade():
     # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_index(op.f("ix_workflow_user_id"), table_name="workflow")
+    op.drop_index(op.f("ix_workflow_run_id"), table_name="workflow")
     op.drop_index(op.f("ix_workflow_experiment_id"), table_name="workflow")
     op.drop_index(op.f("ix_workflow_def_id"), table_name="workflow")
     op.drop_table("workflow")
@@ -322,26 +293,24 @@ def downgrade():
     )
     op.drop_table("run_production_data")
     op.drop_index(op.f("ix_run_detector_experiment_id"), table_name="run_detector")
+    op.drop_index("ix_run_detector_detector_id", table_name="run_detector")
     op.drop_table("run_detector")
     op.drop_index(op.f("ix_logbook_run_id"), table_name="logbook")
     op.drop_index(op.f("ix_logbook_experiment_id"), table_name="logbook")
     op.drop_table("logbook")
-    op.drop_index(
-        op.f("ix_workflowdefinition_experiment_id"), table_name="workflowdefinition"
-    )
-    op.drop_table("workflowdefinition")
     op.drop_index(op.f("ix_run_experiment_id"), table_name="run")
     op.drop_table("run")
     op.drop_index(op.f("ix_questionnaire_experiment_id"), table_name="questionnaire")
     op.drop_table("questionnaire")
     op.drop_table("experiment_slack_channel")
     op.drop_table("experiment_analysis_queue")
+    op.drop_index(op.f("ix_experiment_pi_id"), table_name="experiment")
     op.drop_table("experiment")
     op.drop_table("user_posix_group")
     op.drop_table("pi")
+    op.drop_table("workflowdefinition")
     op.drop_table("user")
     op.drop_table("posix_group")
-    op.drop_table("metadata")
     op.drop_table("detector")
     sa.Enum(name="workflow_trigger_type").drop(op.get_bind(), checkfirst=True)
     sa.Enum(name="elog_content_type").drop(op.get_bind(), checkfirst=True)
