@@ -83,8 +83,10 @@ class Detector(SQLModel, table=True):
 
 class PI(SQLModel, table=True):
     id: str = Field(primary_key=True, foreign_key="user.id")
-    name: str
-    email: str
+    # Parsed from the experiment's free-form contact_info string; nullable in
+    # case the string format doesn't match the expected "Name (email)" pattern.
+    name: str | None = None
+    email: str | None = None
 
     user: User | None = Relationship(back_populates="pi")
     experiments: list[Experiment] = Relationship(back_populates="pi")
