@@ -119,7 +119,7 @@ class Experiment(SQLModel, table=True):
     end_time: datetime | None = Field(
         default=None, sa_column=sa.Column(sa.DateTime(timezone=True), nullable=True)
     )
-    pi_id: str = Field(foreign_key="pi.id")
+    pi_id: str = Field(foreign_key="pi.id", index=True)
     leader_account: str
     posix_group: str = Field(foreign_key="posix_group.name")
     description: str | None = None
