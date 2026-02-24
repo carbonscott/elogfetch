@@ -1,7 +1,6 @@
-from __future__ import annotations
-
 import enum
 from datetime import datetime
+from typing import Optional
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import ARRAY
@@ -62,11 +61,17 @@ class UserPosixGroup(SQLModel, table=True):
 class User(SQLModel, table=True):
     id: str = Field(primary_key=True)
 
-    pi: PI | None = Relationship(back_populates="user")
-    posix_groups: list[PosixGroup] = Relationship(
-        back_populates="users", link_model=UserPosixGroup
+    pi: Optional["PI"] = Relationship(
+        back_populates="user",
+        cascade_delete=True,
     )
-    workflows: list[Workflow] = Relationship(back_populates="user")
+    posix_groups: list["PosixGroup"] = Relationship(
+        back_populates="users", link_model=UserPosixGroup, passive_deletes=True
+    )
+    workflows: list["Workflow"] = Relationship(
+        back_populates="user",
+        passive_deletes=True,
+    )
 
 
 class PosixGroup(SQLModel, table=True):
@@ -75,9 +80,12 @@ class PosixGroup(SQLModel, table=True):
     name: str = Field(primary_key=True)
 
     users: list[User] = Relationship(
-        back_populates="posix_groups", link_model=UserPosixGroup
+        back_populates="posix_groups", link_model=UserPosixGroup, passive_deletes=True
     )
-    experiments: list[Experiment] = Relationship(back_populates="posix_group_obj")
+    experiments: list["Experiment"] = Relationship(
+        back_populates="posix_group_obj",
+        passive_deletes=True,
+    )
 
 
 class Detector(SQLModel, table=True):
@@ -85,7 +93,10 @@ class Detector(SQLModel, table=True):
     name: str = Field(unique=True)
     description: str | None = None
 
-    run_detectors: list[RunDetector] = Relationship(back_populates="detector")
+    run_detectors: list["RunDetector"] = Relationship(
+        back_populates="detector",
+        passive_deletes=True,
+    )
 
 
 # =============================================================================
@@ -94,14 +105,23 @@ class Detector(SQLModel, table=True):
 
 
 class PI(SQLModel, table=True):
-    id: str = Field(primary_key=True, foreign_key="user.id")
+    id: str = Field(
+        sa_column=sa.Column(
+            sa.Text,
+            sa.ForeignKey("user.id", ondelete="CASCADE"),
+            primary_key=True,
+        )
+    )
     # Parsed from the experiment's free-form contact_info string; nullable in
     # case the string format doesn't match the expected "Name (email)" pattern.
     name: str | None = None
     email: str | None = None
 
     user: User | None = Relationship(back_populates="pi")
-    experiments: list[Experiment] = Relationship(back_populates="pi")
+    experiments: list["Experiment"] = Relationship(
+        back_populates="pi",
+        passive_deletes=True,
+    )
 
 
 # =============================================================================
@@ -135,18 +155,30 @@ class Experiment(SQLModel, table=True):
 
     pi: PI | None = Relationship(back_populates="experiments")
     posix_group_obj: PosixGroup | None = Relationship(back_populates="experiments")
-    slack_channel: ExperimentSlackChannel | None = Relationship(
-        back_populates="experiment"
+    slack_channel: Optional["ExperimentSlackChannel"] = Relationship(
+        back_populates="experiment",
+        passive_deletes=True,
     )
-    analysis_queues: list[ExperimentAnalysisQueue] = Relationship(
-        back_populates="experiment"
+    analysis_queues: list["ExperimentAnalysisQueue"] = Relationship(
+        back_populates="experiment",
+        passive_deletes=True,
     )
-    questionnaire_fields: list[Questionnaire] = Relationship(
-        back_populates="experiment"
+    questionnaire_fields: list["Questionnaire"] = Relationship(
+        back_populates="experiment",
+        passive_deletes=True,
     )
-    runs: list[Run] = Relationship(back_populates="experiment")
-    logbook_entries: list[Logbook] = Relationship(back_populates="experiment")
-    workflows: list[Workflow] = Relationship(back_populates="experiment")
+    runs: list["Run"] = Relationship(
+        back_populates="experiment",
+        cascade_delete=True,
+    )
+    logbook_entries: list["Logbook"] = Relationship(
+        back_populates="experiment",
+        passive_deletes=True,
+    )
+    workflows: list["Workflow"] = Relationship(
+        back_populates="experiment",
+        cascade_delete=True,
+    )
 
 
 # =============================================================================
@@ -159,7 +191,13 @@ class ExperimentSlackChannel(SQLModel, table=True):
 
     __tablename__ = "experiment_slack_channel"  # type: ignore[assignment]
 
-    experiment_id: str = Field(primary_key=True, foreign_key="experiment.experiment_id")
+    experiment_id: str = Field(
+        sa_column=sa.Column(
+            sa.Text,
+            sa.ForeignKey("experiment.experiment_id", ondelete="CASCADE"),
+            primary_key=True,
+        )
+    )
     channel: str
 
     experiment: Experiment | None = Relationship(back_populates="slack_channel")
@@ -170,7 +208,13 @@ class ExperimentAnalysisQueue(SQLModel, table=True):
 
     __tablename__ = "experiment_analysis_queue"  # type: ignore[assignment]
 
-    experiment_id: str = Field(primary_key=True, foreign_key="experiment.experiment_id")
+    experiment_id: str = Field(
+        sa_column=sa.Column(
+            sa.Text,
+            sa.ForeignKey("experiment.experiment_id", ondelete="CASCADE"),
+            primary_key=True,
+        )
+    )
     queue: str = Field(primary_key=True)
 
     experiment: Experiment | None = Relationship(back_populates="analysis_queues")
@@ -192,7 +236,14 @@ class Questionnaire(SQLModel, table=True):
         default=None,
         sa_column=sa.Column(sa.BigInteger, primary_key=True, autoincrement=True),
     )
-    experiment_id: str = Field(foreign_key="experiment.experiment_id", index=True)
+    experiment_id: str = Field(
+        sa_column=sa.Column(
+            sa.Text,
+            sa.ForeignKey("experiment.experiment_id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
     proposal: str | None = None
     category: str
     field_id: str
@@ -234,7 +285,10 @@ class WorkflowDefinition(SQLModel, table=True):
     run_param_value: str | None = None
     run_as_user: str | None = None
 
-    workflows: list[Workflow] = Relationship(back_populates="definition")
+    workflows: list["Workflow"] = Relationship(
+        back_populates="definition",
+        passive_deletes=True,
+    )
 
 
 # =============================================================================
@@ -249,7 +303,14 @@ class Run(SQLModel, table=True):
 
     id: str = Field(primary_key=True)
     run_number: int
-    experiment_id: str = Field(foreign_key="experiment.experiment_id", index=True)
+    experiment_id: str = Field(
+        sa_column=sa.Column(
+            sa.Text,
+            sa.ForeignKey("experiment.experiment_id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
     start_time: datetime | None = Field(
         default=None, sa_column=sa.Column(sa.DateTime(timezone=True))
     )
@@ -267,10 +328,22 @@ class Run(SQLModel, table=True):
     )
 
     experiment: Experiment | None = Relationship(back_populates="runs")
-    production_data: RunProductionData | None = Relationship(back_populates="run")
-    detectors: list[RunDetector] = Relationship(back_populates="run")
-    logbook_entries: list[Logbook] = Relationship(back_populates="run")
-    workflows: list[Workflow] = Relationship(back_populates="run")
+    production_data: Optional["RunProductionData"] = Relationship(
+        back_populates="run",
+        cascade_delete=True,
+    )
+    detectors: list["RunDetector"] = Relationship(
+        back_populates="run",
+        passive_deletes=True,
+    )
+    logbook_entries: list["Logbook"] = Relationship(
+        back_populates="run",
+        passive_deletes=True,
+    )
+    workflows: list["Workflow"] = Relationship(
+        back_populates="run",
+        passive_deletes=True,
+    )
 
 
 # =============================================================================
@@ -281,8 +354,24 @@ class Run(SQLModel, table=True):
 class RunProductionData(SQLModel, table=True):
     __tablename__ = "run_production_data"  # type: ignore[assignment]
 
-    run_id: str = Field(primary_key=True, foreign_key="run.id")
-    experiment_id: str = Field(foreign_key="experiment.experiment_id", index=True)
+    # INVARIANT: experiment_id must equal run.experiment_id for run_id.
+    # This is enforced at the application/ETL layer. A DB trigger will be added
+    # when RLS is enabled to prevent silent corruption.
+    run_id: str = Field(
+        sa_column=sa.Column(
+            sa.Text,
+            sa.ForeignKey("run.id", ondelete="CASCADE"),
+            primary_key=True,
+        )
+    )
+    experiment_id: str = Field(
+        sa_column=sa.Column(
+            sa.Text,
+            sa.ForeignKey("experiment.experiment_id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
     n_events: int | None = Field(default=None, sa_column=sa.Column(sa.BigInteger))
     n_damaged: int | None = Field(default=None, sa_column=sa.Column(sa.BigInteger))
     n_dropped: int | None = Field(default=None, sa_column=sa.Column(sa.BigInteger))
@@ -307,10 +396,33 @@ class RunProductionData(SQLModel, table=True):
 
 class RunDetector(SQLModel, table=True):
     __tablename__ = "run_detector"  # type: ignore[assignment]
+    __table_args__ = (sa.Index("ix_run_detector_detector_id", "detector_id"),)
 
-    run_id: str = Field(primary_key=True, foreign_key="run.id")
-    detector_id: str = Field(primary_key=True, foreign_key="detector.id")
-    experiment_id: str = Field(foreign_key="experiment.experiment_id", index=True)
+    # INVARIANT: experiment_id must equal run.experiment_id for run_id.
+    # This is enforced at the application/ETL layer. A DB trigger will be added
+    # when RLS is enabled to prevent silent corruption.
+    run_id: str = Field(
+        sa_column=sa.Column(
+            sa.Text,
+            sa.ForeignKey("run.id", ondelete="CASCADE"),
+            primary_key=True,
+        )
+    )
+    detector_id: str = Field(
+        sa_column=sa.Column(
+            sa.Text,
+            sa.ForeignKey("detector.id", ondelete="RESTRICT"),
+            primary_key=True,
+        )
+    )
+    experiment_id: str = Field(
+        sa_column=sa.Column(
+            sa.Text,
+            sa.ForeignKey("experiment.experiment_id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
     value: str
 
     run: Run | None = Relationship(back_populates="detectors")
@@ -324,8 +436,23 @@ class RunDetector(SQLModel, table=True):
 
 class Logbook(SQLModel, table=True):
     id: str = Field(primary_key=True)
-    experiment_id: str = Field(foreign_key="experiment.experiment_id", index=True)
-    run_id: str | None = Field(default=None, foreign_key="run.id", index=True)
+    experiment_id: str = Field(
+        sa_column=sa.Column(
+            sa.Text,
+            sa.ForeignKey("experiment.experiment_id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
+    run_id: str | None = Field(
+        default=None,
+        sa_column=sa.Column(
+            sa.Text,
+            sa.ForeignKey("run.id", ondelete="SET NULL"),
+            nullable=True,
+            index=True,
+        ),
+    )
     created_time: datetime = Field(
         sa_column=sa.Column(sa.DateTime(timezone=True), nullable=False)
     )
@@ -350,10 +477,42 @@ class Logbook(SQLModel, table=True):
 
 class Workflow(SQLModel, table=True):
     id: str = Field(primary_key=True)
-    experiment_id: str = Field(foreign_key="experiment.experiment_id", index=True)
-    run_id: str = Field(foreign_key="run.id")
-    def_id: str = Field(foreign_key="workflowdefinition.id", index=True)
-    user_id: str = Field(foreign_key="user.id")
+
+    # INVARIANT: experiment_id must equal run.experiment_id for run_id.
+    # This is enforced at the application/ETL layer. A DB trigger will be added
+    # when RLS is enabled to prevent silent corruption.
+    experiment_id: str = Field(
+        sa_column=sa.Column(
+            sa.Text,
+            sa.ForeignKey("experiment.experiment_id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
+    run_id: str = Field(
+        sa_column=sa.Column(
+            sa.Text,
+            sa.ForeignKey("run.id", ondelete="RESTRICT"),
+            nullable=False,
+            index=True,
+        )
+    )
+    def_id: str = Field(
+        sa_column=sa.Column(
+            sa.Text,
+            sa.ForeignKey("workflowdefinition.id", ondelete="RESTRICT"),
+            nullable=False,
+            index=True,
+        )
+    )
+    user_id: str = Field(
+        sa_column=sa.Column(
+            sa.Text,
+            sa.ForeignKey("user.id", ondelete="RESTRICT"),
+            nullable=False,
+            index=True,
+        )
+    )
     status: str
     submit_time: datetime = Field(
         sa_column=sa.Column(sa.DateTime(timezone=True), nullable=False)
