@@ -109,6 +109,13 @@ class Experiment(SQLModel, table=True):
     leader_account: str
     posix_group: str = Field(foreign_key="posix_group.name")
     description: str | None = None
+    fetched_at: datetime = Field(
+        sa_column=sa.Column(
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+    )
 
     pi: PI | None = Relationship(back_populates="experiments")
     posix_group_obj: PosixGroup | None = Relationship(back_populates="experiments")
@@ -237,6 +244,13 @@ class Run(SQLModel, table=True):
     )
     end_time: datetime | None = Field(
         default=None, sa_column=sa.Column(sa.DateTime(timezone=True))
+    )
+    fetched_at: datetime = Field(
+        sa_column=sa.Column(
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
     )
 
     experiment: Experiment | None = Relationship(back_populates="runs")
