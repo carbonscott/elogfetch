@@ -38,8 +38,20 @@ class UserPosixGroup(SQLModel, table=True):
 
     __tablename__ = "user_posix_group"  # type: ignore[assignment]
 
-    user_id: str = Field(primary_key=True, foreign_key="user.id")
-    posix_group_name: str = Field(primary_key=True, foreign_key="posix_group.name")
+    user_id: str = Field(
+        sa_column=sa.Column(
+            sa.Text,
+            sa.ForeignKey("user.id", ondelete="CASCADE"),
+            primary_key=True,
+        )
+    )
+    posix_group_name: str = Field(
+        sa_column=sa.Column(
+            sa.Text,
+            sa.ForeignKey("posix_group.name", ondelete="CASCADE"),
+            primary_key=True,
+        )
+    )
 
 
 # =============================================================================
