@@ -4,7 +4,7 @@ from typing import Optional
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import ARRAY
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import AutoString, Field, Relationship, SQLModel
 
 # =============================================================================
 # ENUMs
@@ -39,14 +39,14 @@ class UserPosixGroup(SQLModel, table=True):
 
     user_id: str = Field(
         sa_column=sa.Column(
-            sa.Text,
+            AutoString,
             sa.ForeignKey("user.id", ondelete="CASCADE"),
             primary_key=True,
         )
     )
     posix_group_name: str = Field(
         sa_column=sa.Column(
-            sa.Text,
+            AutoString,
             sa.ForeignKey("posix_group.name", ondelete="CASCADE"),
             primary_key=True,
         )
@@ -107,7 +107,7 @@ class Detector(SQLModel, table=True):
 class PI(SQLModel, table=True):
     id: str = Field(
         sa_column=sa.Column(
-            sa.Text,
+            AutoString,
             sa.ForeignKey("user.id", ondelete="CASCADE"),
             primary_key=True,
         )
@@ -191,7 +191,7 @@ class ExperimentSlackChannel(SQLModel, table=True):
 
     experiment_id: str = Field(
         sa_column=sa.Column(
-            sa.Text,
+            AutoString,
             sa.ForeignKey("experiment.experiment_id", ondelete="CASCADE"),
             primary_key=True,
         )
@@ -208,7 +208,7 @@ class ExperimentAnalysisQueue(SQLModel, table=True):
 
     experiment_id: str = Field(
         sa_column=sa.Column(
-            sa.Text,
+            AutoString,
             sa.ForeignKey("experiment.experiment_id", ondelete="CASCADE"),
             primary_key=True,
         )
@@ -236,7 +236,7 @@ class Questionnaire(SQLModel, table=True):
     )
     experiment_id: str = Field(
         sa_column=sa.Column(
-            sa.Text,
+            AutoString,
             sa.ForeignKey("experiment.experiment_id", ondelete="CASCADE"),
             nullable=False,
             index=True,
@@ -303,7 +303,7 @@ class Run(SQLModel, table=True):
     run_number: int
     experiment_id: str = Field(
         sa_column=sa.Column(
-            sa.Text,
+            AutoString,
             sa.ForeignKey("experiment.experiment_id", ondelete="CASCADE"),
             nullable=False,
             index=True,
@@ -355,14 +355,14 @@ class RunProductionData(SQLModel, table=True):
     # when RLS is enabled to prevent silent corruption.
     run_id: str = Field(
         sa_column=sa.Column(
-            sa.Text,
+            AutoString,
             sa.ForeignKey("run.id", ondelete="CASCADE"),
             primary_key=True,
         )
     )
     experiment_id: str = Field(
         sa_column=sa.Column(
-            sa.Text,
+            AutoString,
             sa.ForeignKey("experiment.experiment_id", ondelete="CASCADE"),
             nullable=False,
             index=True,
@@ -399,21 +399,21 @@ class RunDetector(SQLModel, table=True):
     # when RLS is enabled to prevent silent corruption.
     run_id: str = Field(
         sa_column=sa.Column(
-            sa.Text,
+            AutoString,
             sa.ForeignKey("run.id", ondelete="CASCADE"),
             primary_key=True,
         )
     )
     detector_id: str = Field(
         sa_column=sa.Column(
-            sa.Text,
+            AutoString,
             sa.ForeignKey("detector.id", ondelete="RESTRICT"),
             primary_key=True,
         )
     )
     experiment_id: str = Field(
         sa_column=sa.Column(
-            sa.Text,
+            AutoString,
             sa.ForeignKey("experiment.experiment_id", ondelete="CASCADE"),
             nullable=False,
             index=True,
@@ -434,7 +434,7 @@ class Logbook(SQLModel, table=True):
     id: str = Field(primary_key=True)
     experiment_id: str = Field(
         sa_column=sa.Column(
-            sa.Text,
+            AutoString,
             sa.ForeignKey("experiment.experiment_id", ondelete="CASCADE"),
             nullable=False,
             index=True,
@@ -443,7 +443,7 @@ class Logbook(SQLModel, table=True):
     run_id: str | None = Field(
         default=None,
         sa_column=sa.Column(
-            sa.Text,
+            AutoString,
             sa.ForeignKey("run.id", ondelete="SET NULL"),
             nullable=True,
             index=True,
@@ -459,7 +459,7 @@ class Logbook(SQLModel, table=True):
             nullable=False,
         )
     )
-    tags: list[str] | None = Field(default=None, sa_column=sa.Column(ARRAY(sa.Text)))
+    tags: list[str] | None = Field(default=None, sa_column=sa.Column(ARRAY(AutoString)))
     author: str
 
     experiment: Experiment | None = Relationship(back_populates="logbook_entries")
@@ -479,7 +479,7 @@ class Workflow(SQLModel, table=True):
     # when RLS is enabled to prevent silent corruption.
     experiment_id: str = Field(
         sa_column=sa.Column(
-            sa.Text,
+            AutoString,
             sa.ForeignKey("experiment.experiment_id", ondelete="CASCADE"),
             nullable=False,
             index=True,
@@ -487,7 +487,7 @@ class Workflow(SQLModel, table=True):
     )
     run_id: str = Field(
         sa_column=sa.Column(
-            sa.Text,
+            AutoString,
             sa.ForeignKey("run.id", ondelete="RESTRICT"),
             nullable=False,
             index=True,
@@ -495,7 +495,7 @@ class Workflow(SQLModel, table=True):
     )
     def_id: str = Field(
         sa_column=sa.Column(
-            sa.Text,
+            AutoString,
             sa.ForeignKey("workflowdefinition.id", ondelete="RESTRICT"),
             nullable=False,
             index=True,
@@ -503,7 +503,7 @@ class Workflow(SQLModel, table=True):
     )
     user_id: str = Field(
         sa_column=sa.Column(
-            sa.Text,
+            AutoString,
             sa.ForeignKey("user.id", ondelete="RESTRICT"),
             nullable=False,
             index=True,
