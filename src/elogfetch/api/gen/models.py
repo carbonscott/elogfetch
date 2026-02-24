@@ -15,6 +15,7 @@ All GET endpoints follow one of two envelope shapes:
 
 from __future__ import annotations
 
+import re as _re
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -386,6 +387,49 @@ class DmLocation(BaseModel):
     name: str
     all_experiments: bool = False
     jid_prefix: str | None = None
+
+
+# --------------- Contact info ------------------------------------------------
+
+
+_CONTACT_RE = _re.compile(r"^\s*(.+?)\s*\(([^)]+)\)\s*$")
+
+
+def _parse_contact_info(value: Any) -> Any:
+    """BeforeValidator: accept either a raw ``"Name (email)"`` string or an
+    already-decomposed dict.  Falls back gracefully if the pattern doesn't match.
+    """
+    if not isinstance(value, str):
+        return value
+    m = _CONTACT_RE.match(value)
+    if m:
+        name, email = m.group(1), m.group(2)
+        # Only treat as email if it contains '@'
+        if "@" in email:
+            return {"name": name.strip(), "email": email.strip()}
+        # Parens but no email — treat the whole thing as name
+        return {"name": value.strip(), "email": None}
+    return {"name": value.strip(), "email": None}
+
+
+class ContactInfo(BaseModel):
+    """Parsed from the experiment ``contact_info`` free-form string.
+
+    Accepts either a raw ``"Name (email@example.com)"`` string (via
+    ``BeforeValidator``) or a pre-decomposed dict.
+    """
+
+    model_config = _cfg
+
+    name: str | None = None
+    email: str | None = None
+
+    # Applied before field-level validation so the string → dict conversion
+    # runs once at the model boundary, not per-field.
+    @model_validator(mode="before")
+    @classmethod
+    def parse_string(cls, data: Any) -> Any:
+        return _parse_contact_info(data)
 
 
 # --------------- Experiments -------------------------------------------------
