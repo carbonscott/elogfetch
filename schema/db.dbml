@@ -1,3 +1,6 @@
+// DBML schema for elogfetch
+// Auto-generated from schema/db.sql via scripts/dbml/sql_to_dbml.ts
+// DO NOT EDIT MANUALLY — run `make schema` to regenerate.
 
 Enum "workflow_trigger_type" {
   "MANUAL"
@@ -16,17 +19,18 @@ Enum "elog_content_type" {
 }
 
 Table "detector" {
-  "id" TEXT [not null]
-  "name" TEXT [unique, not null]
-  "description" TEXT
+  "id" VARCHAR [not null]
+  "name" VARCHAR [not null]
+  "description" VARCHAR
 
   Indexes {
     id [pk]
+    name [unique]
   }
 }
 
 Table "posix_group" {
-  "name" TEXT [not null]
+  "name" VARCHAR [not null]
 
   Indexes {
     name [pk]
@@ -34,7 +38,7 @@ Table "posix_group" {
 }
 
 Table "user" {
-  "id" TEXT [not null]
+  "id" VARCHAR [not null]
 
   Indexes {
     id [pk]
@@ -42,15 +46,15 @@ Table "user" {
 }
 
 Table "workflowdefinition" {
-  "id" TEXT [not null]
-  "name" TEXT [not null]
-  "executable" TEXT [not null]
+  "id" VARCHAR [not null]
+  "name" VARCHAR [not null]
+  "executable" VARCHAR [not null]
   "trigger" workflow_trigger_type [not null]
-  "location" TEXT [not null]
-  "parameters" TEXT
-  "run_param_name" TEXT
-  "run_param_value" TEXT
-  "run_as_user" TEXT
+  "location" VARCHAR [not null]
+  "parameters" VARCHAR
+  "run_param_name" VARCHAR
+  "run_param_value" VARCHAR
+  "run_as_user" VARCHAR
 
   Indexes {
     id [pk]
@@ -58,9 +62,9 @@ Table "workflowdefinition" {
 }
 
 Table "pi" {
-  "id" TEXT [not null]
-  "name" TEXT
-  "email" TEXT
+  "id" VARCHAR [not null]
+  "name" VARCHAR
+  "email" VARCHAR
 
   Indexes {
     id [pk]
@@ -68,8 +72,8 @@ Table "pi" {
 }
 
 Table "user_posix_group" {
-  "user_id" TEXT [not null]
-  "posix_group_name" TEXT [not null]
+  "user_id" VARCHAR [not null]
+  "posix_group_name" VARCHAR [not null]
 
   Indexes {
     (user_id, posix_group_name) [pk]
@@ -77,16 +81,16 @@ Table "user_posix_group" {
 }
 
 Table "experiment" {
-  "experiment_id" TEXT [not null]
-  "name" TEXT [not null]
-  "instrument" TEXT [not null]
-  "start_time" TIMESTAMPTZ [not null]
-  "end_time" TIMESTAMPTZ
-  "pi_id" TEXT [not null]
-  "leader_account" TEXT [not null]
-  "posix_group" TEXT [not null]
-  "description" TEXT
-  "fetched_at" TIMESTAMPTZ [not null, default: `now()`]
+  "experiment_id" VARCHAR [not null]
+  "name" VARCHAR [not null]
+  "instrument" VARCHAR [not null]
+  "start_time" TIMESTAMP [not null]
+  "end_time" TIMESTAMP
+  "pi_id" VARCHAR [not null]
+  "leader_account" VARCHAR [not null]
+  "posix_group" VARCHAR [not null]
+  "description" VARCHAR
+  "fetched_at" TIMESTAMP [not null, default: `now()`]
 
   Indexes {
     experiment_id [pk]
@@ -95,8 +99,8 @@ Table "experiment" {
 }
 
 Table "experiment_analysis_queue" {
-  "experiment_id" TEXT [not null]
-  "queue" TEXT [not null]
+  "experiment_id" VARCHAR [not null]
+  "queue" VARCHAR [not null]
 
   Indexes {
     (experiment_id, queue) [pk]
@@ -104,8 +108,8 @@ Table "experiment_analysis_queue" {
 }
 
 Table "experiment_slack_channel" {
-  "experiment_id" TEXT [not null]
-  "channel" TEXT [not null]
+  "experiment_id" VARCHAR [not null]
+  "channel" VARCHAR [not null]
 
   Indexes {
     experiment_id [pk]
@@ -113,59 +117,61 @@ Table "experiment_slack_channel" {
 }
 
 Table "questionnaire" {
-  "questionnaire_id" BIGSERIAL [increment]
-  "experiment_id" TEXT [not null]
-  "proposal" TEXT
-  "category" TEXT [not null]
-  "field_id" TEXT [not null]
-  "field_name" TEXT
-  "field_value" TEXT
-  "modified_time" TIMESTAMPTZ
-  "modified_uid" TEXT
-  "created_time" TIMESTAMPTZ [not null]
+  "questionnaire_id" BIGSERIAL [not null, increment]
+  "experiment_id" VARCHAR [not null]
+  "proposal" VARCHAR
+  "category" VARCHAR [not null]
+  "field_id" VARCHAR [not null]
+  "field_name" VARCHAR
+  "field_value" VARCHAR
+  "modified_time" TIMESTAMP
+  "modified_uid" VARCHAR
+  "created_time" TIMESTAMP [not null]
 
   Indexes {
     questionnaire_id [pk]
+    (experiment_id, field_id) [unique, name: "uq_questionnaire_exp_field"]
     experiment_id [name: "ix_questionnaire_experiment_id"]
   }
 }
 
 Table "run" {
-  "id" TEXT [not null]
+  "id" VARCHAR [not null]
   "run_number" INTEGER [not null]
-  "experiment_id" TEXT [not null]
-  "start_time" TIMESTAMPTZ
-  "end_time" TIMESTAMPTZ
-  "fetched_at" TIMESTAMPTZ [not null, default: `now()`]
+  "experiment_id" VARCHAR [not null]
+  "start_time" TIMESTAMP
+  "end_time" TIMESTAMP
+  "fetched_at" TIMESTAMP [not null, default: `now()`]
 
   Indexes {
     id [pk]
+    (run_number, experiment_id) [unique, name: "uq_run_number_exp"]
     experiment_id [name: "ix_run_experiment_id"]
   }
 }
 
 Table "logbook" {
-  "id" TEXT [not null]
-  "experiment_id" TEXT [not null]
-  "run_id" TEXT
-  "created_time" TIMESTAMPTZ [not null]
-  "content" TEXT
+  "id" VARCHAR [not null]
+  "experiment_id" VARCHAR [not null]
+  "run_id" VARCHAR
+  "created_time" TIMESTAMP [not null]
+  "content" VARCHAR
   "content_type" elog_content_type [not null]
-  "tags" BLOB
-  "author" TEXT [not null]
+  "tags" "VARCHAR[]"
+  "author" VARCHAR [not null]
 
   Indexes {
     id [pk]
-    experiment_id [name: "ix_logbook_experiment_id"]
     run_id [name: "ix_logbook_run_id"]
+    experiment_id [name: "ix_logbook_experiment_id"]
   }
 }
 
 Table "run_detector" {
-  "run_id" TEXT [not null]
-  "detector_id" TEXT [not null]
-  "experiment_id" TEXT [not null]
-  "value" TEXT [not null]
+  "run_id" VARCHAR [not null]
+  "detector_id" VARCHAR [not null]
+  "experiment_id" VARCHAR [not null]
+  "value" VARCHAR [not null]
 
   Indexes {
     (run_id, detector_id) [pk]
@@ -175,13 +181,13 @@ Table "run_detector" {
 }
 
 Table "run_production_data" {
-  "run_id" TEXT [not null]
-  "experiment_id" TEXT [not null]
+  "run_id" VARCHAR [not null]
+  "experiment_id" VARCHAR [not null]
   "n_events" BIGINT
   "n_damaged" BIGINT
   "n_dropped" BIGINT
-  "start_timestamp" TIMESTAMPTZ
-  "end_timestamp" TIMESTAMPTZ
+  "start_timestamp" TIMESTAMP
+  "end_timestamp" TIMESTAMP
   "file_count" BIGINT
   "file_size_bytes" BIGINT
 
@@ -192,61 +198,61 @@ Table "run_production_data" {
 }
 
 Table "workflow" {
-  "id" TEXT [not null]
-  "experiment_id" TEXT [not null]
-  "run_id" TEXT [not null]
-  "def_id" TEXT [not null]
-  "user_id" TEXT [not null]
-  "status" TEXT [not null]
-  "submit_time" TIMESTAMPTZ [not null]
+  "id" VARCHAR [not null]
+  "experiment_id" VARCHAR [not null]
+  "run_id" VARCHAR [not null]
+  "def_id" VARCHAR [not null]
+  "user_id" VARCHAR [not null]
+  "status" VARCHAR [not null]
+  "submit_time" TIMESTAMP [not null]
   "tool_id" BIGINT
-  "log_file_path" TEXT
+  "log_file_path" VARCHAR
 
   Indexes {
     id [pk]
-    def_id [name: "ix_workflow_def_id"]
-    experiment_id [name: "ix_workflow_experiment_id"]
     run_id [name: "ix_workflow_run_id"]
     user_id [name: "ix_workflow_user_id"]
+    experiment_id [name: "ix_workflow_experiment_id"]
+    def_id [name: "ix_workflow_def_id"]
   }
 }
 
-Ref:"user"."id" < "pi"."id" [update: no action, delete: cascade]
+Ref:"user"."id" < "pi"."id" [delete: cascade]
 
-Ref:"posix_group"."name" < "user_posix_group"."posix_group_name" [update: no action, delete: cascade]
+Ref:"user"."id" < "user_posix_group"."user_id" [delete: cascade]
 
-Ref:"user"."id" < "user_posix_group"."user_id" [update: no action, delete: cascade]
+Ref:"posix_group"."name" < "user_posix_group"."posix_group_name" [delete: cascade]
 
-Ref:"pi"."id" < "experiment"."pi_id" [update: no action, delete: no action]
+Ref:"pi"."id" < "experiment"."pi_id"
 
-Ref:"posix_group"."name" < "experiment"."posix_group" [update: no action, delete: no action]
+Ref:"posix_group"."name" < "experiment"."posix_group"
 
-Ref:"experiment"."experiment_id" < "experiment_analysis_queue"."experiment_id" [update: no action, delete: cascade]
+Ref:"experiment"."experiment_id" < "experiment_analysis_queue"."experiment_id" [delete: cascade]
 
-Ref:"experiment"."experiment_id" < "experiment_slack_channel"."experiment_id" [update: no action, delete: cascade]
+Ref:"experiment"."experiment_id" < "experiment_slack_channel"."experiment_id" [delete: cascade]
 
-Ref:"experiment"."experiment_id" < "questionnaire"."experiment_id" [update: no action, delete: cascade]
+Ref:"experiment"."experiment_id" < "questionnaire"."experiment_id" [delete: cascade]
 
-Ref:"experiment"."experiment_id" < "run"."experiment_id" [update: no action, delete: cascade]
+Ref:"experiment"."experiment_id" < "run"."experiment_id" [delete: cascade]
 
-Ref:"experiment"."experiment_id" < "logbook"."experiment_id" [update: no action, delete: cascade]
+Ref:"experiment"."experiment_id" < "logbook"."experiment_id" [delete: cascade]
 
-Ref:"run"."id" < "logbook"."run_id" [update: no action, delete: set null]
+Ref:"run"."id" < "logbook"."run_id" [delete: set null]
 
-Ref:"detector"."id" < "run_detector"."detector_id" [update: no action, delete: restrict]
+Ref:"run"."id" < "run_detector"."run_id" [delete: cascade]
 
-Ref:"experiment"."experiment_id" < "run_detector"."experiment_id" [update: no action, delete: cascade]
+Ref:"detector"."id" < "run_detector"."detector_id" [delete: restrict]
 
-Ref:"run"."id" < "run_detector"."run_id" [update: no action, delete: cascade]
+Ref:"experiment"."experiment_id" < "run_detector"."experiment_id" [delete: cascade]
 
-Ref:"experiment"."experiment_id" < "run_production_data"."experiment_id" [update: no action, delete: cascade]
+Ref:"run"."id" < "run_production_data"."run_id" [delete: cascade]
 
-Ref:"run"."id" < "run_production_data"."run_id" [update: no action, delete: cascade]
+Ref:"experiment"."experiment_id" < "run_production_data"."experiment_id" [delete: cascade]
 
-Ref:"workflowdefinition"."id" < "workflow"."def_id" [update: no action, delete: restrict]
+Ref:"experiment"."experiment_id" < "workflow"."experiment_id" [delete: cascade]
 
-Ref:"experiment"."experiment_id" < "workflow"."experiment_id" [update: no action, delete: cascade]
+Ref:"run"."id" < "workflow"."run_id" [delete: restrict]
 
-Ref:"run"."id" < "workflow"."run_id" [update: no action, delete: restrict]
+Ref:"workflowdefinition"."id" < "workflow"."def_id" [delete: restrict]
 
-Ref:"user"."id" < "workflow"."user_id" [update: no action, delete: restrict]
+Ref:"user"."id" < "workflow"."user_id" [delete: restrict]

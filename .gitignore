@@ -32,6 +32,9 @@ elog_*.db
 env.local
 .uv-cache/
 
+# Node (scripts/dbml utility)
+scripts/dbml/node_modules/
+
 # OS
 .DS_Store
 Thumbs.db
