@@ -146,7 +146,7 @@ class Experiment(SQLModel, table=True):
     fetched_at: datetime = Field(
         sa_column=sa.Column(
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=sa.func.now(),
             nullable=False,
         ),
     )
@@ -318,7 +318,7 @@ class Run(SQLModel, table=True):
     fetched_at: datetime = Field(
         sa_column=sa.Column(
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=sa.func.now(),
             nullable=False,
         ),
     )
