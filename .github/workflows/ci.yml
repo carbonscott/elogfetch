@@ -38,4 +38,4 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked --dev
       - name: Run tests
-        run: uv run python -m pytest --ignore=tests/test_migrations.py --cov=elogfetch --cov-report=term-missing
+        run: uv run pytest --cov=elogfetch --cov-report=term-missing
