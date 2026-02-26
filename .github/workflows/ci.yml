@@ -19,11 +19,11 @@ jobs:
         with:
           enable-cache: true
       - name: Check lockfile is up-to-date
-        run: uv sync --locked --dev
+        run: uv lock --check
       - name: Lint
-        run: uv run ruff check src/ tests/
+        run: uvx ruff check src/ tests/
       - name: Check formatting
-        run: uv run ruff format --check src/ tests/
+        run: uvx ruff format --check src/ tests/
 
   test:
     needs: lint
