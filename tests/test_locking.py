@@ -1,11 +1,9 @@
 """Tests for file locking utilities."""
 
-from __future__ import annotations
-
 import pytest
 
-from elogfetch.utils.locking import acquire_lock
 from elogfetch.exceptions import LockError
+from elogfetch.utils.locking import acquire_lock
 
 
 class TestAcquireLock:

@@ -1,13 +1,11 @@
 """Fetch file manager data for an experiment."""
 
-from __future__ import annotations
-
 from collections import defaultdict
 from typing import Any
 
-from .client import ElogClient
 from ..exceptions import APIError
 from ..utils import get_logger
+from .client import ElogClient
 
 logger = get_logger()
 

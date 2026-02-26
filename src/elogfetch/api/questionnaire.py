@@ -1,13 +1,11 @@
 """Fetch questionnaire data for an experiment."""
 
-from __future__ import annotations
-
 import re
 from typing import Any
 
-from .client import ElogClient
 from ..exceptions import APIError
 from ..utils import get_logger
+from .client import ElogClient
 
 logger = get_logger()
 
@@ -49,9 +47,7 @@ def fetch_questionnaire(
             return None
 
         # Fetch questionnaire
-        questionnaire_endpoint = (
-            f"/ws-kerb/questionnaire/ws/proposal/attribute/run{lcls_run}/{proposal_number}"
-        )
+        questionnaire_endpoint = f"/ws-kerb/questionnaire/ws/proposal/attribute/run{lcls_run}/{proposal_number}"
 
         questionnaire_data = client.get(questionnaire_endpoint)
 
@@ -115,13 +111,15 @@ def _parse_questionnaire_fields(
             # Extract field name by removing category prefix
             field_name = field_id.replace(f"{category}-", "") if field_id else None
 
-            fields.append({
-                "category": category,
-                "field_id": field_id,
-                "field_name": field_name,
-                "field_value": field_data.get("val"),
-                "modified_time": field_data.get("modified_time"),
-                "modified_uid": field_data.get("modified_uid"),
-            })
+            fields.append(
+                {
+                    "category": category,
+                    "field_id": field_id,
+                    "field_name": field_name,
+                    "field_value": field_data.get("val"),
+                    "modified_time": field_data.get("modified_time"),
+                    "modified_uid": field_data.get("modified_uid"),
+                }
+            )
 
     return fields

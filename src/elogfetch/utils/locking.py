@@ -1,11 +1,10 @@
 """File locking utilities for elogfetch."""
 
-from __future__ import annotations
-
 import fcntl
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator, IO
+from typing import IO
 
 from ..exceptions import LockError
 
@@ -39,7 +38,7 @@ def acquire_lock(
             lock_file.close()
             raise LockError(
                 f"Another instance is already running (lock: {lock_path})"
-            )
+            ) from None
 
         yield lock_file
 

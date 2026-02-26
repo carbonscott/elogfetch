@@ -1,12 +1,10 @@
 """Fetch run table data for an experiment."""
 
-from __future__ import annotations
-
 from typing import Any
 
-from .client import ElogClient
 from ..exceptions import APIError
 from ..utils import get_logger
+from .client import ElogClient
 
 logger = get_logger()
 
@@ -31,7 +29,9 @@ def fetch_runtable(
 
     try:
         # Fetch runs list
-        runs_data = client.get(f"{base_endpoint}/runs", params={"includeParams": "false"})
+        runs_data = client.get(
+            f"{base_endpoint}/runs", params={"includeParams": "false"}
+        )
         if not runs_data.get("value"):
             logger.warning(f"No runs found for {experiment_id}")
             return None
@@ -76,16 +76,18 @@ def fetch_runtable(
             params = detail.get("params", {})
 
             # Data production entry
-            result["data_production"].append({
-                "run_number": run_num,
-                "n_events": params.get("DAQ Detector Totals/Events"),
-                "n_damaged": params.get("DAQ Detector Totals/Damaged"),
-                "n_dropped": params.get("N dropped Shots"),
-                "start_time": _format_time(detail.get("begin_time")),
-                "end_time": _format_time(detail.get("end_time")),
-                "prod_start": params.get("Prod_start"),
-                "prod_end": params.get("Prod_end"),
-            })
+            result["data_production"].append(
+                {
+                    "run_number": run_num,
+                    "n_events": params.get("DAQ Detector Totals/Events"),
+                    "n_damaged": params.get("DAQ Detector Totals/Damaged"),
+                    "n_dropped": params.get("N dropped Shots"),
+                    "start_time": _format_time(detail.get("begin_time")),
+                    "end_time": _format_time(detail.get("end_time")),
+                    "prod_start": params.get("Prod_start"),
+                    "prod_end": params.get("Prod_end"),
+                }
+            )
 
             # Detector entry
             detector_entry = {"run_number": run_num}
@@ -93,7 +95,9 @@ def fetch_runtable(
                 detector_entry[key] = "Checked" if params.get(key) else "Unchecked"
             result["detectors"].append(detector_entry)
 
-        logger.info(f"Processed {len(result['data_production'])} runs for {experiment_id}")
+        logger.info(
+            f"Processed {len(result['data_production'])} runs for {experiment_id}"
+        )
         return result
 
     except APIError as e:

@@ -1,11 +1,6 @@
 """Tests for database operations."""
 
-from __future__ import annotations
-
 import sqlite3
-from pathlib import Path
-
-import pytest
 
 from elogfetch.storage.database import Database
 
@@ -312,7 +307,9 @@ class TestStatistics:
 class TestRunAndDetectorOperations:
     """Tests for run and detector data."""
 
-    def test_runtable_insert(self, tmp_path, sample_experiment_data, sample_runtable_data):
+    def test_runtable_insert(
+        self, tmp_path, sample_experiment_data, sample_runtable_data
+    ):
         """Test inserting run table data."""
         db_path = tmp_path / "test.db"
         db = Database(db_path)

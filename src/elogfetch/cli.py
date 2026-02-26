@@ -1,27 +1,25 @@
 """Command-line interface for elogfetch."""
 
-from __future__ import annotations
-
 import json
 import logging
 import queue
 import shutil
 import sys
-from pathlib import Path
-from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from threading import Thread, Event, Lock
+from datetime import datetime
+from pathlib import Path
+from threading import Event, Lock, Thread
 
 import click
 
 from .api import (
     ElogClient,
-    fetch_updated_experiments,
     fetch_experiment_info,
     fetch_file_manager,
     fetch_logbook,
-    fetch_runtable,
     fetch_questionnaire,
+    fetch_runtable,
+    fetch_updated_experiments,
     fetch_workflow,
 )
 from .config import Config
@@ -57,18 +55,46 @@ def cli(ctx, config, verbose, quiet):
 
 
 @cli.command()
-@click.option("--hours", "-H", type=float, help="Hours to look back (default: from config)")
-@click.option("--exclude", "-e", multiple=True, help="Patterns to exclude (e.g., -e 'txi*')")
-@click.option("--output-dir", "-o", type=click.Path(), help="Output directory for database")
-@click.option("--dry-run", is_flag=True, help="Show what would be done without making changes")
+@click.option(
+    "--hours", "-H", type=float, help="Hours to look back (default: from config)"
+)
+@click.option(
+    "--exclude", "-e", multiple=True, help="Patterns to exclude (e.g., -e 'txi*')"
+)
+@click.option(
+    "--output-dir", "-o", type=click.Path(), help="Output directory for database"
+)
+@click.option(
+    "--dry-run", is_flag=True, help="Show what would be done without making changes"
+)
 @click.option("--parallel", "-p", type=int, help="Number of parallel jobs")
-@click.option("--incremental", "-i", type=click.Path(), default=None,
-              is_flag=False, flag_value="AUTO",
-              help="Update existing database incrementally. Optionally specify base database path.")
-@click.option("--queue-size", "-q", type=int, help="Queue size for streaming (default: 100)")
-@click.option("--batch-size", "-b", type=int, help="Experiments per commit batch (default: 50)")
+@click.option(
+    "--incremental",
+    "-i",
+    type=click.Path(),
+    default=None,
+    is_flag=False,
+    flag_value="AUTO",
+    help="Update existing database incrementally. Optionally specify base database path.",
+)
+@click.option(
+    "--queue-size", "-q", type=int, help="Queue size for streaming (default: 100)"
+)
+@click.option(
+    "--batch-size", "-b", type=int, help="Experiments per commit batch (default: 50)"
+)
 @click.pass_context
-def update(ctx, hours, exclude, output_dir, dry_run, parallel, incremental, queue_size, batch_size):
+def update(
+    ctx,
+    hours,
+    exclude,
+    output_dir,
+    dry_run,
+    parallel,
+    incremental,
+    queue_size,
+    batch_size,
+):
     """Update the local database with recent experiments."""
     logger = ctx.obj["logger"]
     config = ctx.obj["config"]
@@ -207,11 +233,13 @@ def _do_update(client, experiments, db_dir, config, logger, incremental=None):
 
                 if "error" in data:
                     with counter_lock:
-                        failed_experiments.append({
-                            "experiment_id": exp_id,
-                            "error": data["error"],
-                            "timestamp": datetime.now().isoformat(),
-                        })
+                        failed_experiments.append(
+                            {
+                                "experiment_id": exp_id,
+                                "error": data["error"],
+                                "timestamp": datetime.now().isoformat(),
+                            }
+                        )
                     data_queue.task_done()
                     continue
 
@@ -232,11 +260,13 @@ def _do_update(client, experiments, db_dir, config, logger, incremental=None):
                 except Exception as e:
                     logger.warning(f"Error writing {exp_id}: {e}")
                     with counter_lock:
-                        failed_experiments.append({
-                            "experiment_id": exp_id,
-                            "error": str(e),
-                            "timestamp": datetime.now().isoformat(),
-                        })
+                        failed_experiments.append(
+                            {
+                                "experiment_id": exp_id,
+                                "error": str(e),
+                                "timestamp": datetime.now().isoformat(),
+                            }
+                        )
 
                 data_queue.task_done()
 
@@ -279,7 +309,9 @@ def _do_update(client, experiments, db_dir, config, logger, incremental=None):
     # Fetch in parallel with progress bar
     if config.parallel_jobs > 1:
         with ThreadPoolExecutor(max_workers=config.parallel_jobs) as executor:
-            futures = {executor.submit(fetch_and_queue, exp): exp for exp in experiments}
+            futures = {
+                executor.submit(fetch_and_queue, exp): exp for exp in experiments
+            }
 
             with click.progressbar(
                 as_completed(futures),
@@ -317,7 +349,9 @@ def _do_update(client, experiments, db_dir, config, logger, incremental=None):
 
 @cli.command()
 @click.argument("experiment_id")
-@click.option("--output-dir", "-o", type=click.Path(), help="Output directory for database")
+@click.option(
+    "--output-dir", "-o", type=click.Path(), help="Output directory for database"
+)
 @click.pass_context
 def fetch(ctx, experiment_id, output_dir):
     """Fetch data for a specific experiment."""
@@ -351,7 +385,7 @@ def fetch(ctx, experiment_id, output_dir):
         info = fetch_experiment_info(client, experiment_id)
         if info:
             db.insert_experiment(info)
-            logger.info(f"Fetched experiment info")
+            logger.info("Fetched experiment info")
 
         logbook = fetch_logbook(client, experiment_id)
         if logbook:
@@ -361,17 +395,21 @@ def fetch(ctx, experiment_id, output_dir):
         runtable = fetch_runtable(client, experiment_id)
         if runtable:
             db.insert_runtable(runtable)
-            logger.info(f"Fetched runtable data")
+            logger.info("Fetched runtable data")
 
         file_manager = fetch_file_manager(client, experiment_id)
         if file_manager:
             db.insert_file_manager(file_manager)
-            logger.info(f"Fetched file manager data ({len(file_manager.get('file_manager_records', []))} runs)")
+            logger.info(
+                f"Fetched file manager data ({len(file_manager.get('file_manager_records', []))} runs)"
+            )
 
         questionnaire = fetch_questionnaire(client, experiment_id)
         if questionnaire:
             db.insert_questionnaire(questionnaire)
-            logger.info(f"Fetched questionnaire ({len(questionnaire.get('fields', []))} fields)")
+            logger.info(
+                f"Fetched questionnaire ({len(questionnaire.get('fields', []))} fields)"
+            )
 
         workflow = fetch_workflow(client, experiment_id)
         if workflow:
@@ -390,11 +428,12 @@ def fetch(ctx, experiment_id, output_dir):
 
 
 @cli.command()
-@click.option("--database-dir", "-d", type=click.Path(exists=True), help="Database directory")
+@click.option(
+    "--database-dir", "-d", type=click.Path(exists=True), help="Database directory"
+)
 @click.pass_context
 def status(ctx, database_dir):
     """Show status of local database."""
-    logger = ctx.obj["logger"]
     config = ctx.obj["config"]
 
     db_dir = Path(database_dir) if database_dir else config.database_dir or Path.cwd()
@@ -403,7 +442,7 @@ def status(ctx, database_dir):
 
     if not db_path:
         click.echo("No database found.")
-        click.echo(f"Run 'elogfetch update' to create one.")
+        click.echo("Run 'elogfetch update' to create one.")
         return
 
     click.echo(f"Database: {db_path}")
@@ -432,7 +471,9 @@ def status(ctx, database_dir):
 
 
 @cli.command()
-@click.option("--hours", "-H", type=float, default=168, help="Hours to look back (default: 168)")
+@click.option(
+    "--hours", "-H", type=float, default=168, help="Hours to look back (default: 168)"
+)
 @click.option("--exclude", "-e", multiple=True, help="Patterns to exclude")
 @click.pass_context
 def list_experiments(ctx, hours, exclude):
@@ -457,7 +498,9 @@ def list_experiments(ctx, hours, exclude):
             click.echo("No experiments found.")
             return
 
-        click.echo(f"Found {len(experiments)} experiments updated in last {hours} hours:")
+        click.echo(
+            f"Found {len(experiments)} experiments updated in last {hours} hours:"
+        )
         for exp in sorted(experiments):
             click.echo(f"  {exp}")
 
@@ -470,8 +513,12 @@ def list_experiments(ctx, hours, exclude):
 
 
 @cli.command()
-@click.option("--file", "-f", type=click.Path(exists=True), help="Path to failed_experiments.json")
-@click.option("--output-dir", "-o", type=click.Path(), help="Output directory for database")
+@click.option(
+    "--file", "-f", type=click.Path(exists=True), help="Path to failed_experiments.json"
+)
+@click.option(
+    "--output-dir", "-o", type=click.Path(), help="Output directory for database"
+)
 @click.option("--parallel", "-p", type=int, help="Number of parallel jobs")
 @click.pass_context
 def retry(ctx, file, output_dir, parallel):
@@ -528,7 +575,9 @@ def retry(ctx, file, output_dir, parallel):
         lock_path = db_dir / ".elogfetch.lock"
         try:
             with acquire_lock(lock_path):
-                _do_update(client, experiments, db_dir, config, logger, incremental="AUTO")
+                _do_update(
+                    client, experiments, db_dir, config, logger, incremental="AUTO"
+                )
         except LockError as e:
             logger.error(str(e))
             sys.exit(1)

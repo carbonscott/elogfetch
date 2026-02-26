@@ -1,0 +1,17 @@
+{
+  "name": "elogfetch-dbml",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Utility to convert schema/db.sql to schema/db.dbml via @dbml/core",
+  "scripts": {
+    "gen": "ts-node sql_to_dbml.ts"
+  },
+  "dependencies": {
+    "@dbml/core": "^6.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.0"
+  }
+}

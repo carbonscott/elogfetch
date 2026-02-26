@@ -1,13 +1,11 @@
 """Fetch experiment information."""
 
-from __future__ import annotations
-
 import re
 from typing import Any
 
-from .client import ElogClient
 from ..exceptions import APIError
 from ..utils import get_logger
+from .client import ElogClient
 
 logger = get_logger()
 

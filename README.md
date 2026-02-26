@@ -2,55 +2,47 @@
 
 Fetch LCLS experiment data from the electronic logbook (elog) system and store it in a local SQLite database.
 
-## Installation
-
-This package requires `krtc` which is only available in SLAC conda environments.
-
-### Setup
-
-1. Create a `.env` file from the template:
-```bash
-cp .env.example .env
-```
-
-2. Edit `.env` to set paths for your environment (`UV_CACHE_DIR` and `UV_PYTHON`)
-
-3. Create a virtual environment and install:
-```bash
-set -a; source .env; set +a
-uv venv --python $UV_PYTHON --system-site-packages
-unset UV_PYTHON  # so uv pip targets .venv, not the conda env
-uv pip install -e .
-```
-
-4. Activate the environment:
-```bash
-source .venv/bin/activate
-```
-
-### Available conda environments with krtc
-```bash
-ls /sdf/group/lcls/ds/ana/sw/conda1/inst/envs/
-```
-
 ## Prerequisites
 
-- Valid Kerberos ticket for SLAC authentication
-- Python 3.9+ (from a SLAC conda environment with `krtc`)
+- Python 3.10+
+- `mamba` or `conda` (build-time only, for krb5 headers)
+- SLAC Kerberos credentials (prompted automatically on first use)
 
-Before using, authenticate with Kerberos:
+## Installation on S3DF
+
+Authentication uses the `gssapi` package, which can be compiled if we have `krb5-config` binary in our path + related headers `gssapi`-related shared libs. On S3DF we do not have the `krb5-devel` package installed, so that binary is not present. However the `krb5` conda package has that binary, so we can create a minmal conda environment to provide these at build time.
+
+1. Create a minimal conda environment with the krb5 headers:
+
 ```bash
-kinit
+cd elogfetch
+mamba create --prefix $(pwd)/.krb5 krb5
+```
+
+1. Install dependencies, pointing `gssapi`'s build to the right place:
+
+```bash
+GSSAPI_KRB5CONFIG=$(pwd)/.krb5/bin/krb5-config \
+GSSAPI_MAIN_LIB=/usr/lib64/libgssapi_krb5.so.2 \
+uv sync
+```
+
+1. Activate the virtual environment:
+
+```bash
+source .venv/bin/activate
 ```
 
 ## Usage
 
 ### Check status
+
 ```bash
 elogfetch status
 ```
 
 ### Update database with recent experiments
+
 ```bash
 # Fetch experiments updated in the last 24 hours
 elogfetch update --hours 24
@@ -75,11 +67,13 @@ elogfetch update --hours 24 --incremental /path/to/existing.db
 ```
 
 ### Fetch a specific experiment
+
 ```bash
 elogfetch fetch mfxl1033223
 ```
 
 ### Retry failed experiments
+
 ```bash
 # Retry experiments that failed in a previous run
 elogfetch retry
@@ -89,6 +83,7 @@ elogfetch retry --file /path/to/failed_experiments.json
 ```
 
 ### List recently updated experiments
+
 ```bash
 elogfetch list-experiments --hours 72
 ```
@@ -117,6 +112,7 @@ Configuration precedence: CLI args > environment variables > config file > defau
 ### Advanced Options
 
 The `update` command supports tuning parameters for large datasets:
+
 - `--queue-size`: Buffer size for streaming (default: 100)
 - `--batch-size`: Experiments per database commit (default: 50)
 
@@ -127,6 +123,7 @@ The `update` command supports tuning parameters for large datasets:
 If experiments are missing from the database (e.g., an instrument had no activity during the normal lookback window), you can run a one-time backfill with a longer lookback period.
 
 **Why experiments might be missing:**
+
 - The cron job uses a 7-day (168 hour) lookback window by default
 - Experiments only appear in the API response if they had elog activity within the lookback period
 - If an instrument was inactive for longer than the lookback window, its experiments won't be captured
@@ -159,6 +156,7 @@ sqlite3 elog-copilot.db "SELECT experiment_id, start_time FROM Experiment WHERE 
 ```
 
 **Why this is safe:**
+
 - The `.elogfetch.lock` file prevents cron from running simultaneously
 - Creates a new timestamped database file (doesn't overwrite existing ones)
 - Uses `--incremental` to preserve existing data and only update changed experiments
@@ -181,16 +179,17 @@ The database is stored as `elog_YYYY_MMDD_HHMM.db` with the following tables:
 ## Development
 
 ```bash
-pip install -e ".[dev]"
+uv sync
+uv run prek install
 
 # Run tests (use python -m to ensure correct interpreter)
-python -m pytest
-python -m pytest -v                                        # Verbose
-python -m pytest --cov=elogfetch --cov-report=term-missing # Coverage
+uv run pytest
+uv run pytest -v # Verbose
+uv run pytest --cov=elogfetch --cov-report=term-missing # Coverage
 
 # Format code
-black src/
-ruff check src/ --fix
+uv run ruff format src/
+uv run ruff check src/ --fix
 ```
 
 ## Technical Notes

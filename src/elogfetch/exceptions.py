@@ -1,7 +1,5 @@
 """Custom exceptions for elogfetch."""
 
-from __future__ import annotations
-
 
 class FetchElogError(Exception):
     """Base exception for elogfetch."""

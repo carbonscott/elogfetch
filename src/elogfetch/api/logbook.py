@@ -1,12 +1,10 @@
 """Fetch logbook entries for an experiment."""
 
-from __future__ import annotations
-
 from typing import Any
 
-from .client import ElogClient
 from ..exceptions import APIError
 from ..utils import get_logger
+from .client import ElogClient
 
 logger = get_logger()
 
@@ -73,15 +71,17 @@ def _transform_entries(
         else:
             run_number = inferred_runs.get(entry_id)
 
-        transformed.append({
-            "log_id": entry_id,
-            "experiment_id": experiment_id,
-            "run_number": run_number,
-            "timestamp": entry.get("insert_time"),
-            "content": entry.get("content"),
-            "tags": _format_tags(entry.get("tags")),
-            "author": entry.get("author"),
-        })
+        transformed.append(
+            {
+                "log_id": entry_id,
+                "experiment_id": experiment_id,
+                "run_number": run_number,
+                "timestamp": entry.get("insert_time"),
+                "content": entry.get("content"),
+                "tags": _format_tags(entry.get("tags")),
+                "author": entry.get("author"),
+            }
+        )
 
     return transformed
 

@@ -1,12 +1,9 @@
 """Fetch list of recently updated experiments."""
 
-from __future__ import annotations
-
 import re
-from typing import Any
 
-from .client import ElogClient
 from ..utils import get_logger
+from .client import ElogClient
 
 logger = get_logger()
 
@@ -31,7 +28,7 @@ def fetch_updated_experiments(
 
     logger.info(f"Fetching experiments updated in last {offset_secs} seconds...")
 
-    data = client.get_public(endpoint, params=params)
+    data = client.get(endpoint, params=params, require_auth=False)
 
     # Extract experiment names from the response
     if isinstance(data, dict) and "value" in data:
@@ -85,7 +82,9 @@ def _filter_experiments(
             filtered.append(exp)
 
     if excluded_count > 0:
-        logger.info(f"Excluded {excluded_count} experiments by patterns {exclude_patterns}")
+        logger.info(
+            f"Excluded {excluded_count} experiments by patterns {exclude_patterns}"
+        )
 
     logger.info(f"Returning {len(filtered)} experiments after filtering")
     return filtered

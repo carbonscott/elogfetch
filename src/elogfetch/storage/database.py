@@ -1,7 +1,5 @@
 """SQLite database operations for elogfetch."""
 
-from __future__ import annotations
-
 import json
 import sqlite3
 from datetime import datetime
@@ -321,7 +319,9 @@ class Database:
                 ),
             )
 
-        logger.debug(f"Inserted {len(fields)} questionnaire fields for: {experiment_id}")
+        logger.debug(
+            f"Inserted {len(fields)} questionnaire fields for: {experiment_id}"
+        )
 
     def insert_workflow(self, data: dict[str, Any]) -> None:
         """Insert workflow definitions."""
@@ -360,7 +360,9 @@ class Database:
                 ),
             )
 
-        logger.debug(f"Inserted {len(data.get('workflows', []))} workflows for: {experiment_id}")
+        logger.debug(
+            f"Inserted {len(data.get('workflows', []))} workflows for: {experiment_id}"
+        )
 
     def insert_logbook(self, entries: list[dict[str, Any]]) -> None:
         """Insert logbook entries."""
@@ -623,19 +625,30 @@ class Database:
         # Delete in order (respecting foreign keys)
         for run_id in run_ids:
             self.conn.execute("DELETE FROM RunDetector WHERE run_id = ?", (run_id,))
-            self.conn.execute("DELETE FROM RunProductionData WHERE run_id = ?", (run_id,))
+            self.conn.execute(
+                "DELETE FROM RunProductionData WHERE run_id = ?", (run_id,)
+            )
 
-        self.conn.execute("DELETE FROM Logbook WHERE experiment_id = ?", (experiment_id,))
+        self.conn.execute(
+            "DELETE FROM Logbook WHERE experiment_id = ?", (experiment_id,)
+        )
         self.conn.execute("DELETE FROM Run WHERE experiment_id = ?", (experiment_id,))
-        self.conn.execute("DELETE FROM Questionnaire WHERE experiment_id = ?", (experiment_id,))
-        self.conn.execute("DELETE FROM Workflow WHERE experiment_id = ?", (experiment_id,))
-        self.conn.execute("DELETE FROM Experiment WHERE experiment_id = ?", (experiment_id,))
+        self.conn.execute(
+            "DELETE FROM Questionnaire WHERE experiment_id = ?", (experiment_id,)
+        )
+        self.conn.execute(
+            "DELETE FROM Workflow WHERE experiment_id = ?", (experiment_id,)
+        )
+        self.conn.execute(
+            "DELETE FROM Experiment WHERE experiment_id = ?", (experiment_id,)
+        )
 
         self.conn.commit()
 
         # Clear caches for this experiment
         self._run_id_cache = {
-            k: v for k, v in self._run_id_cache.items()
+            k: v
+            for k, v in self._run_id_cache.items()
             if not k.startswith(f"{experiment_id}_")
         }
 
